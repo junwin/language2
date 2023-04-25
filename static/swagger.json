@@ -1,0 +1,56 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Lucy API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/ask": {
+      "post": {
+        "summary": "Ask a question",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string"
+                  },
+                  "agentName": {
+                    "type": "string"
+                  },
+                  "accountName": {
+                    "type": "string"
+                  }
+                },
+                "required": ["question", "agentName", "accountName"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI assistant's response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "response": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (missing question, agentName, or accountName)"
+          }
+        }
+      }
+    }
+  }
+}
