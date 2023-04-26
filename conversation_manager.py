@@ -73,6 +73,11 @@ class ConversationManager:
         return keywords
 
 
+    def concatenate_keywords(self, conversation_data):
+        keywords = conversation_data["keywords"]
+        concatenated_keywords = " ".join(keywords)
+        return concatenated_keywords
+
     def tokenize(self, text):
         return nltk.word_tokenize(text)
 
@@ -89,8 +94,13 @@ class ConversationManager:
         collected_conversations = []
 
         for prompt in conversations["prompts"]:
-            similarity = self.semantic_similarity(tokenized_text, prompt["keywords"])
-
+            concat_text = self.concatenate_content(prompt)
+            concatenate_keywords = self.concatenate_keywords(prompt)
+            # similarity = self.semantic_similarity(tokenized_text, prompt["keywords"])
+            # similarity = self.semantic_similarity(tokenized_text, self.tokenize(concat_text))
+            similarity = self.semantic_similarity(tokenized_text, self.tokenize(concatenate_keywords))
+            print (similarity)
+            print (concat_text)
             if similarity > min_similarity_threshold:
                 # Copy the conversation and add the similarity and utc_timestamp
                 conversation = [conv.copy() for conv in prompt["conversation"]]
@@ -112,29 +122,13 @@ class ConversationManager:
 
 
 
+    def concatenate_content(self, conversation_data):
+        conversation = conversation_data["conversation"]
+        concatenated_content = ""
+        for message in conversation:
+            concatenated_content += message["content"] + " "
+        return concatenated_content.strip()
 
-
-    def find_closest_conversationold(self, input_text: str, number_to_return=2) -> List[Dict]:
-        tokenized_text = self.tokenize(input_text)
-        conversations = self.prompts
-
-        max_similarity = 0
-        best_conversation = None
-        best_timestamp = None
-
-        for prompt in conversations["prompts"]:
-            similarity = self.semantic_similarity(tokenized_text, prompt["keywords"])
-            if similarity > max_similarity:
-                max_similarity = similarity
-                best_conversation = prompt["conversation"]
-                best_timestamp = prompt["utc_timestamp"]
-
-        if max_similarity > 0:
-            for conv in best_conversation:
-                conv["utc_timestamp"] = best_timestamp
-            return best_conversation
-
-        return []
 
 
     def find_latest_conversation(self, number_to_return: int) -> List[Dict]:
