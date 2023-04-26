@@ -36,3 +36,5 @@ static/*.ico
 *.pem
 conversations.json
 *.pyc
+output/response_1.txt
+output/*.txt

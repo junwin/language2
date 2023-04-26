@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "language2"
+version = "0.1.0"
+description = "provide a convesational agent using openai"
+authors = ["junwin <jdunwin@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+openai = "^0.27.4"
+flask = "^2.3.0"
+flask-swagger-ui = "^4.11.1"
+flask-cors = "^3.0.10"
+nltk = "^3.8.1"
+spacy = "^3.5.2"
+scikit-learn = "^1.2.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

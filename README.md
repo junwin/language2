@@ -4,17 +4,17 @@
 python3 -m venv venv
 source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-pip install nltk spacy scikit-learn
+pip install -r requirements.txt
+
+
 python -m spacy download en_core_web_sm
 python -m spacy download es_core_news_sm
-pip install flask
-pip install flask-swagger-ui
-pip install flask-cors
+
 
 # running in flask
 python app.py
 
-You can access the Swagger UI at http://localhost:5000/api/docs
+You can access the Swagger UI at https://localhost:5000/api/docs
 
 The web service will start listening on http://localhost:5000. You can send a POST request to http://localhost:5000/ask with a JSON payload containing the question:
 

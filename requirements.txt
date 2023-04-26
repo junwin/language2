@@ -1,0 +1,7 @@
+openai
+Flask
+flask-swagger-ui
+Flask-CORS
+nltk
+spacy
+scikit-learn
