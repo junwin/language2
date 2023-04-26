@@ -19,10 +19,10 @@ class MessageProcessor:
         self.handler = handler
         self.open_conversations()
 
-    def process_message(self, message):
+    def process_message(self, message, conversationId="0"):
         logging.info(f'Processing message inbound: {message}')
 
-        conversation = self.assemble_conversation(message)
+        conversation = self.assemble_conversation(message, conversationId)
 
         logging.info(f'Processing message prompt: {conversation}')
         
@@ -35,7 +35,7 @@ class MessageProcessor:
         if not response.startswith("Response is too long"):
             conversation.append({"role": "system", "content": response})
 
-        self.conv_manager.store_conversation(conversation)
+        self.conv_manager.store_conversation(conversation, conversationId)
 
         return response
 
@@ -48,7 +48,7 @@ class MessageProcessor:
         except FileNotFoundError:
             print('The file does not exist.')
 
-    def assemble_conversation(self, content_text, max_prompt_chars=4000, max_prompt_conversations=20):
+    def assemble_conversation(self, content_text, conversationId, max_prompt_chars=4000, max_prompt_conversations=20):
         logging.info(f'assemble_conversation: {self.context_type}')
         my_content = [{"role": "user", "content": content_text}]
 
@@ -56,7 +56,9 @@ class MessageProcessor:
             matched_elements = self.conv_manager.get_conversations(content_text)
         elif self.context_type == "semantic":
             matched_elements = self.conv_manager.find_closest_conversation(content_text,8,0.1)
-            matched_elements = matched_elements + self.conv_manager.find_latest_conversation(1)
+        elif self.context_type == "hybrid":
+            matched_elements = self.conv_manager.find_closest_conversation(content_text,8,0.1)
+            matched_elements = matched_elements + self.conv_manager.find_latest_conversation(2)
         elif self.context_type == "fifo":
             matched_elements = self.conv_manager.find_latest_conversation(3)
         else:
@@ -96,4 +98,5 @@ class MessageProcessor:
             conversations = self.seed_conversations + matched_conversations[-remaining_space:] + my_content
             logging.info(f'Processing matched_elements 4: {conversations}')
 
+        logging.info(f'returned prompt: {conversations}')
         return conversations

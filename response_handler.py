@@ -15,7 +15,7 @@ class FileResponseHandler(ResponseHandler):
                 os.makedirs(output_folder)
 
             output_file_path = os.path.join(output_folder, f"response_{len(os.listdir(output_folder)) + 1}.txt")
-            with open(output_file_path, "w") as output_file:
+            with open(output_file_path, "w", encoding="utf-8") as output_file:
                 output_file.write(response)
             return f"Response is too long. It has been saved to {output_file_path}"
         else:

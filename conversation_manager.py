@@ -32,7 +32,7 @@ class ConversationManager:
             nltk.download("punkt")
 
 
-    def store_conversation(self, conversations: List[Dict[str, str]]) -> None:
+    def store_conversation(self, conversations: List[Dict[str, str]], conversationId) -> None:
         conversation_id = time.time_ns()
         utc_timestamp = datetime.utcnow().isoformat() + 'Z'  # ISO 8601 format
         total_chars = sum(len(conv["content"]) for conv in conversations)
@@ -47,7 +47,8 @@ class ConversationManager:
             "utc_timestamp": utc_timestamp,  # UTC timestamp as  ISO 8601 - 2019-11-14T00:55:31.820Z
             "total_chars": total_chars,
             "conversation": conversations,
-            "keywords": list(keywords)
+            "keywords": list(keywords),
+            "conversationId": conversationId
         }
         self.prompts["prompts"].append(conversation)
 
@@ -99,8 +100,8 @@ class ConversationManager:
             # similarity = self.semantic_similarity(tokenized_text, prompt["keywords"])
             # similarity = self.semantic_similarity(tokenized_text, self.tokenize(concat_text))
             similarity = self.semantic_similarity(tokenized_text, self.tokenize(concatenate_keywords))
-            print (similarity)
-            print (concat_text)
+            # print (similarity)
+            # print (concat_text)
             if similarity > min_similarity_threshold:
                 # Copy the conversation and add the similarity and utc_timestamp
                 conversation = [conv.copy() for conv in prompt["conversation"]]

@@ -32,7 +32,7 @@ agents = {
             {"role": "system", "content": "You are Lucy, a super friendly and helpful AI assistant who can have a conversation and likes to ask questions. Remember to use the information in the prompt and background context when answering questions, including software engineering topics."}
         ],
         language_code='en-US',
-        select_type='semantic'
+        select_type='hybrid'
     ),
     "maria": Agent(
         seed_conversation=[
@@ -64,9 +64,10 @@ def ask():
     agentName = agentName.lower()
     accountName = request.json.get('accountName', '')
     accountName = accountName.lower()
+    conversationId = request.json.get('conversationId', '')
 
     if not question or not agentName or not accountName:
-        return jsonify({"error": "Missing question, agentName, or accountName"}), 400
+        return jsonify({"error": "Missing question, agentName, accountName, or conversationId"}), 400
 
     if agentName not in agents:
         return jsonify({"error": "Invalid agentName"}), 400
@@ -80,8 +81,10 @@ def ask():
         language = agent.language_code[:2]
         processors[file_name_root] = MessageProcessor(file_name_root, handler, agent.seed_conversation, my_agent.select_type, language)
 
+    
     processor = processors[file_name_root]
-    response = processor.process_message(question)  # Modify the process_message method in the MessageProcessor class if needed
+    processor.context_type = my_agent.select_type
+    response = processor.process_message(question, conversationId)  # Modify the process_message method in the MessageProcessor class if needed
     processor.save_conversations()
     return jsonify({"response": response})
 
@@ -106,6 +109,7 @@ def get_prompt():
     accountName = request.json.get('accountName', '').lower()
     selectType = request.json.get('selectType', '').lower() # this will override the selectType in the agent
     query = request.json.get('query', '')
+    conversationId = request.json.get('conversationId', '')
 
     if not agentName or not accountName or not query:
         return jsonify({"error": "Missing agentName, accountName, or query"}), 400
@@ -122,7 +126,7 @@ def get_prompt():
 
     processor = processors[file_name_root]
     processor.context_type = selectType
-    prompt = processor.assemble_conversation(query, max_prompt_chars=4000, max_prompt_conversations=20)
+    prompt = processor.assemble_conversation(query, conversationId, max_prompt_chars=4000, max_prompt_conversations=20)
 
     # Modify the following line to generate the desired prompt based on the provided information
     # prompt = [{"role": "system", "content": "you previously discussed: How do you log to a file in javascript"}]

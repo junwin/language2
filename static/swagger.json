@@ -23,9 +23,12 @@
                   },
                   "accountName": {
                     "type": "string"
+                  },
+                  "conversationId": {
+                    "type": "string"
                   }
                 },
-                "required": ["question", "agentName", "accountName"]
+                "required": ["question", "agentName", "accountName", "conversationId"]
               }
             }
           }
@@ -120,9 +123,12 @@
                   },
                   "query": {
                     "type": "string"
+                  },
+                  "conversationId": {
+                    "type": "string"
                   }
                 },
-                "required": ["agentName", "accountName", "selectType", "query"]
+                "required": ["agentName", "accountName", "selectType", "query", "conversationid"]
               }
             }
           }

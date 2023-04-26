@@ -16,7 +16,7 @@ def role_play(seed_conversation=[], file_name_root='out', context_type="semantic
         if user_input == "exit":
             return
 
-        response = processor.process_message(user_input)
+        response = processor.process_message(user_input, "console")
 
         print(response)
 
@@ -24,4 +24,4 @@ lucy = [
     {"role": "system", "content": "You are Lucy, a super friendly and helpful AI assistant who can have a conversation and likes to ask questions. Remember to use the information in the prompt and background context when answering questions, including software engineering topics."}
 ]
 
-role_play(seed_conversation=lucy, file_name_root='lucy', context_type='semantic', language_code='en-US')
+role_play(seed_conversation=lucy, file_name_root='lucy', context_type='hybrid', language_code='en-US')
