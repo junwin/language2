@@ -17,6 +17,8 @@ CORS(app)
 SWAGGER_URL = '/api/docs'
 API_URL = '/static/swagger.json'
 
+prompt_base_path = "data/prompts"
+
 swaggerui_blueprint = get_swaggerui_blueprint(
     SWAGGER_URL,
     API_URL,
@@ -25,6 +27,8 @@ swaggerui_blueprint = get_swaggerui_blueprint(
     }
 )
 app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+
+
 
 agents = {
     "lucy": Agent(
@@ -40,7 +44,7 @@ agents = {
             {"role": "system", "content": "Today is 22th April. we have a dog called Smokey and we are beginners"},
     ],
         language_code='es-US',
-        select_type='fifo'
+        select_type='latest'
     ),
     "pedro": Agent(
         seed_conversation=[
@@ -48,7 +52,7 @@ agents = {
             {"role": "system", "content": "Juan your student is going send you sentences or phrases in Spanish and you will check the grammar and spelling to requests, translate them to englis, show how to pronounce things and explain any errors"},
         ],
         language_code='es-US',
-        select_type='fifo'
+        select_type='latest'
     )
     
 }
@@ -73,16 +77,17 @@ def ask():
         return jsonify({"error": "Invalid agentName"}), 400
 
     my_agent = agents[agentName]
+    processor_name = get_processor_name(agentName, accountName)
+    file_path = get_complete_path(prompt_base_path, agentName, accountName)
 
-    file_name_root = f'{agentName}_{accountName}'
     
-    if file_name_root not in processors:
+    if processor_name not in processors:
         agent = agents[agentName]
         language = agent.language_code[:2]
-        processors[file_name_root] = MessageProcessor(file_name_root, handler, agent.seed_conversation, my_agent.select_type, language)
+        processors[processor_name] = MessageProcessor(file_path, handler, agent.seed_conversation, my_agent.select_type, language)
 
     
-    processor = processors[file_name_root]
+    processor = processors[processor_name]
     processor.context_type = my_agent.select_type
     response = processor.process_message(question, conversationId)  # Modify the process_message method in the MessageProcessor class if needed
     processor.save_conversations()
@@ -117,14 +122,17 @@ def get_prompt():
     if agentName not in agents:
         return jsonify({"error": "Invalid agentName"}), 400
 
-    file_name_root = f'{agentName}_{accountName}'
+    processor_name = get_processor_name(agentName, accountName)
+    file_path = get_complete_path(prompt_base_path, agentName, accountName)
+
     
-    if file_name_root not in processors:
+    
+    if processor_name not in processors:
         agent = agents[agentName]
         language = agent.language_code[:2]
-        processors[file_name_root] = MessageProcessor(file_name_root, handler, agent.seed_conversation, selectType, language)
+        processors[processor_name] = MessageProcessor(file_path, handler, agent.seed_conversation, selectType, language)
 
-    processor = processors[file_name_root]
+    processor = processors[processor_name]
     processor.context_type = selectType
     prompt = processor.assemble_conversation(query, conversationId, max_prompt_chars=4000, max_prompt_conversations=20)
 
@@ -133,6 +141,13 @@ def get_prompt():
 
     return jsonify(prompt)
 
+def get_complete_path(base_path, agent_name, account_name):
+    full_path = base_path + '/' + agent_name + '_' + account_name
+    return full_path
+
+def get_processor_name(agent_name, account_name):
+    processor_name = agent_name + '_' + account_name
+    return processor_name
     
 if __name__ == "__main__":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

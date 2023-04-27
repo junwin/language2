@@ -59,7 +59,7 @@ class MessageProcessor:
         elif self.context_type == "hybrid":
             matched_elements = self.conv_manager.find_closest_conversation(content_text,8,0.1)
             matched_elements = matched_elements + self.conv_manager.find_latest_conversation(2)
-        elif self.context_type == "fifo":
+        elif self.context_type == "latest":
             matched_elements = self.conv_manager.find_latest_conversation(3)
         else:
             matched_elements = []
