@@ -68,6 +68,7 @@ def ask():
     agentName = agentName.lower()
     accountName = request.json.get('accountName', '')
     accountName = accountName.lower()
+    select_type = request.json.get('selectType', '')
     conversationId = request.json.get('conversationId', '')
 
     if not question or not agentName or not accountName:
@@ -88,7 +89,10 @@ def ask():
 
     
     processor = processors[processor_name]
-    processor.context_type = my_agent.select_type
+    if not select_type:
+        select_type = my_agent.select_type
+
+    processor.context_type = select_type
     response = processor.process_message(question, conversationId)  # Modify the process_message method in the MessageProcessor class if needed
     processor.save_conversations()
     return jsonify({"response": response})
@@ -107,6 +111,28 @@ def get_agents():
         for agent_name, agent in agents.items()
     ]
     return jsonify(agents_list)
+
+
+@app.route('/prompts', methods=['GET'])
+def get_prompts():
+    # Add the logic to handle the GET request for prompts here
+    return jsonify({"message": "GET request for prompts not implemented yet"})
+
+@app.route('/prompts', methods=['POST'])
+def post_prompts():
+    # Add the logic to handle the POST request for prompts here
+    return jsonify({"message": "POST request for prompts not implemented yet"})
+
+@app.route('/prompts', methods=['PUT'])
+def put_prompts():
+    # Add the logic to handle the PUT request for prompts here
+    return jsonify({"message": "PUT request for prompts not implemented yet"})
+
+@app.route('/prompts', methods=['DELETE'])
+def delete_prompts():
+    # Add the logic to handle the DELETE request for prompts here
+    return jsonify({"message": "DELETE request for prompts not implemented yet"})
+
 
 @app.route('/prompt', methods=['POST'])
 def get_prompt():

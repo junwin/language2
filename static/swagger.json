@@ -28,7 +28,12 @@
                     "type": "string"
                   }
                 },
-                "required": ["question", "agentName", "accountName", "conversationId"]
+                "required": [
+                  "question",
+                  "agentName",
+                  "accountName",
+                  "conversationId"
+                ]
               }
             }
           }
@@ -83,7 +88,10 @@
                               "type": "string"
                             }
                           },
-                          "required": ["role", "content"]
+                          "required": [
+                            "role",
+                            "content"
+                          ]
                         }
                       },
                       "language_code": {
@@ -93,7 +101,12 @@
                         "type": "string"
                       }
                     },
-                    "required": ["agentName", "seed_conversation", "language_code", "select_type"]
+                    "required": [
+                      "agentName",
+                      "seed_conversation",
+                      "language_code",
+                      "select_type"
+                    ]
                   }
                 }
               }
@@ -102,7 +115,7 @@
         }
       }
     },
-    "/prompt": {
+    "/prompts": {
       "post": {
         "summary": "Get the prompt that would be used given an agentName, accountName, selectType and query text",
         "requestBody": {
@@ -128,7 +141,13 @@
                     "type": "string"
                   }
                 },
-                "required": ["agentName", "accountName", "selectType", "query", "conversationid"]
+                "required": [
+                  "agentName",
+                  "accountName",
+                  "selectType",
+                  "query",
+                  "conversationid"
+                ]
               }
             }
           }
@@ -150,7 +169,10 @@
                         "type": "string"
                       }
                     },
-                    "required": ["role", "content"]
+                    "required": [
+                      "role",
+                      "content"
+                    ]
                   }
                 }
               }
@@ -158,6 +180,200 @@
           },
           "400": {
             "description": "Bad request (missing agentName, accountName, selectType or query)"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get one or more prompts",
+        "parameters": [
+          {
+            "name": "agentName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of prompt objects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "conversationId": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "conversationId",
+                      "content",
+                      "role"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a prompt",
+        "parameters": [
+          {
+            "name": "accountName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "object",
+                    "properties": {
+                      "conversationId": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "conversationId",
+                      "content",
+                      "role"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "prompt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated prompt object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "conversationId": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversationId",
+                    "content",
+                    "role"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (missing accountName or prompt object)"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a prompt",
+        "parameters": [
+          {
+            "name": "accountName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prompt successfully deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (missing accountName or id)"
           }
         }
       }
