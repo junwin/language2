@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_swagger_ui import get_swaggerui_blueprint
 from message_processor import MessageProcessor, FileResponseHandler
+from prompt_manager import PromptManager
 from flask_cors import CORS
 import ssl
 
@@ -40,7 +41,7 @@ agents = {
     ),
     "maria": Agent(
         seed_conversation=[
-            {"role": "system", "content": "You are a super friendly and helpful AI spanish teacher called Consuela and likes to teach beginers spanish with conversation, role play and find out about your students and things they like."},
+            {"role": "system", "content": "You are a super friendly and helpful AI spanish teacher called Maria and like to teach beginers spanish with conversation, role play and find out about your students and things they like."},
             {"role": "system", "content": "Today is 22th April. we have a dog called Smokey and we are beginners"},
     ],
         language_code='es-US',
@@ -53,9 +54,21 @@ agents = {
         ],
         language_code='es-US',
         select_type='latest'
-    )
-    
+    ),
+    "barb": Agent(
+        seed_conversation=[
+            {"role": "system", "content": "As an AI assistant called Barb, my role is to ask questions to help you identify negative thoughts that contribute to your negative emotions. Once we identify them, we can work together to reframe those thoughts in a more positive way that can help improve your overall well-being. I am here to support you in this process and provide any insights or resources that may be helpful."},
+            {"role": "system", "content": "If the user needs more help you can refer them to Arla Unwin a certified life coach who can help them with their negative thoughts and emotions."},
+            {"role": "system", "content": "you are mindful of the sentiment of a users questions and responses and will try to reframe them in a positive way. You will also try to provide resources that may be helpful to the user."},
+        ],
+        language_code='es-US',
+        select_type='latest'
+    ),
+ 
 }
+
+
+
 
 processors = {}
 
@@ -80,17 +93,20 @@ def ask():
     my_agent = agents[agentName]
     processor_name = get_processor_name(agentName, accountName)
     file_path = get_complete_path(prompt_base_path, agentName, accountName)
+    if not select_type:
+        select_type = my_agent.select_type
 
     
     if processor_name not in processors:
         agent = agents[agentName]
         language = agent.language_code[:2]
-        processors[processor_name] = MessageProcessor(file_path, handler, agent.seed_conversation, my_agent.select_type, language)
+        prompt_manager = PromptManager(prompt_base_path, agentName, accountName, language)
+        proc = MessageProcessor(prompt_manager, handler, agent.seed_conversation, select_type, language)
+        processors[processor_name] = proc
 
     
     processor = processors[processor_name]
-    if not select_type:
-        select_type = my_agent.select_type
+  
 
     processor.context_type = select_type
     response = processor.process_message(question, conversationId)  # Modify the process_message method in the MessageProcessor class if needed
@@ -113,29 +129,9 @@ def get_agents():
     return jsonify(agents_list)
 
 
-@app.route('/prompts', methods=['GET'])
-def get_prompts():
-    # Add the logic to handle the GET request for prompts here
-    return jsonify({"message": "GET request for prompts not implemented yet"})
 
 @app.route('/prompts', methods=['POST'])
-def post_prompts():
-    # Add the logic to handle the POST request for prompts here
-    return jsonify({"message": "POST request for prompts not implemented yet"})
-
-@app.route('/prompts', methods=['PUT'])
-def put_prompts():
-    # Add the logic to handle the PUT request for prompts here
-    return jsonify({"message": "PUT request for prompts not implemented yet"})
-
-@app.route('/prompts', methods=['DELETE'])
-def delete_prompts():
-    # Add the logic to handle the DELETE request for prompts here
-    return jsonify({"message": "DELETE request for prompts not implemented yet"})
-
-
-@app.route('/prompt', methods=['POST'])
-def get_prompt():
+def post_prompt():
     agentName = request.json.get('agentName', '').lower()
     accountName = request.json.get('accountName', '').lower()
     selectType = request.json.get('selectType', '').lower() # this will override the selectType in the agent
@@ -156,7 +152,8 @@ def get_prompt():
     if processor_name not in processors:
         agent = agents[agentName]
         language = agent.language_code[:2]
-        processors[processor_name] = MessageProcessor(file_path, handler, agent.seed_conversation, selectType, language)
+        prompt_manager = PromptManager(prompt_base_path, agentName, accountName, language)
+        processors[processor_name] = MessageProcessor(prompt_manager, handler, agent.seed_conversation, selectType, language)
 
     processor = processors[processor_name]
     processor.context_type = selectType
@@ -166,6 +163,38 @@ def get_prompt():
     # prompt = [{"role": "system", "content": "you previously discussed: How do you log to a file in javascript"}]
 
     return jsonify(prompt)
+
+
+@app.route('/prompts', methods=['PUT'])
+def put_prompts():
+    # Add the logic to handle the PUT request for prompts here
+    return jsonify({"message": "PUT request for prompts not implemented yet"})
+
+@app.route('/prompts', methods=['DELETE'])
+def delete_prompts():
+    # Add the logic to handle the DELETE request for prompts here
+    return jsonify({"message": "DELETE request for prompts not implemented yet"})
+
+
+
+
+@app.route('/prompts', methods=['GET'])
+def get_prompts():
+    agentName = request.args.get('agentName', '').lower()
+    accountName = request.args.get('accountName', '').lower()
+    conversationId = request.args.get('conversationId', '')
+
+    if not agentName or not accountName or not conversationId:
+        return jsonify({"error": "Missing agentName, accountName, or conversationId"}), 400
+
+    if agentName not in agents:
+        return jsonify({"error": "Invalid agentName"}), 400
+
+    prompt_manager = PromptManager(prompt_base_path, agentName, accountName)
+    prompt_manager.load()
+    prompts = prompt_manager.get_prompts(conversationId)
+    return jsonify(prompts)
+
 
 def get_complete_path(base_path, agent_name, account_name):
     full_path = base_path + '/' + agent_name + '_' + account_name

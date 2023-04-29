@@ -1,6 +1,6 @@
 import openai
 import logging
-from conversation_manager import ConversationManager
+from prompt_manager import PromptManager
 from response_handler import ResponseHandler
 from response_handler import FileResponseHandler
 from api_helpers import ask_question
@@ -10,10 +10,10 @@ logging.basicConfig(filename='my_log_file.log', level=logging.INFO, format='%(as
 
 
 class MessageProcessor:
-    def __init__(self, name, handler, seed_conversations, context_type, language):
-        self.name = name
+    def __init__(self, prompt_manager, handler, seed_conversations, context_type, language):
+        #self.name = name
         self.language = language
-        self.conv_manager = ConversationManager(language)
+        self.prompt_manager = prompt_manager
         self.seed_conversations = seed_conversations
         self.context_type = context_type
         self.handler = handler
@@ -35,32 +35,34 @@ class MessageProcessor:
         if not response.startswith("Response is too long"):
             conversation.append({"role": "system", "content": response})
 
-        self.conv_manager.store_conversation(conversation, conversationId)
+        self.prompt_manager.store_prompt(conversation, conversationId)
 
         return response
 
     def save_conversations(self):
-        self.conv_manager.save(self.name+"_conv.json")
+        self.prompt_manager.save()
 
     def open_conversations(self):
         try:
-            self.conv_manager.load(self.name+"_conv.json")
+            self.prompt_manager.load()
         except FileNotFoundError:
             print('The file does not exist.')
+
+
 
     def assemble_conversation(self, content_text, conversationId, max_prompt_chars=4000, max_prompt_conversations=20):
         logging.info(f'assemble_conversation: {self.context_type}')
         my_content = [{"role": "user", "content": content_text}]
 
         if self.context_type == "keyword":
-            matched_elements = self.conv_manager.get_conversations(content_text)
+            matched_elements = self.prompt_manager.get_conversations(content_text)
         elif self.context_type == "semantic":
-            matched_elements = self.conv_manager.find_closest_conversation(content_text,8,0.1)
+            matched_elements = self.prompt_manager.find_closest_conversation(content_text,8,0.1)
         elif self.context_type == "hybrid":
-            matched_elements = self.conv_manager.find_closest_conversation(content_text,8,0.1)
-            matched_elements = matched_elements + self.conv_manager.find_latest_conversation(2)
+            matched_elements = self.prompt_manager.find_closest_conversation(content_text,8,0.1)
+            matched_elements = matched_elements + self.prompt_manager.find_latest_conversation(2)
         elif self.context_type == "latest":
-            matched_elements = self.conv_manager.find_latest_conversation(3)
+            matched_elements = self.prompt_manager.find_latest_conversation(3)
         else:
             matched_elements = []
 

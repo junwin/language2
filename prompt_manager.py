@@ -18,9 +18,9 @@ nltk.download('wordnet')
 nltk.download('punkt')
 
 
-class ConversationManager:
-    def __init__(self, language_code = "en"):
-        self.prompts = {"prompts": []}
+class PromptManager:
+    def __init__(self, base_path, agent_name, account_name, language_code = "en"):
+        self.prompts_data = {"prompts": []}
         self.language_code = language_code
         if language_code == "es":
             self.nlp = spacy.load("es_core_news_sm")
@@ -30,9 +30,12 @@ class ConversationManager:
             nltk.data.find("tokenizers/punkt")
         except LookupError:
             nltk.download("punkt")
+        self.agent_name = agent_name
+        self.account_name = account_name
+        self.base_path = base_path
 
 
-    def store_conversation(self, conversations: List[Dict[str, str]], conversationId) -> None:
+    def store_prompt(self, conversations: List[Dict[str, str]], conversationId) -> None:
         conversation_id = time.time_ns()
         utc_timestamp = datetime.utcnow().isoformat() + 'Z'  # ISO 8601 format
         total_chars = sum(len(conv["content"]) for conv in conversations)
@@ -50,7 +53,7 @@ class ConversationManager:
             "keywords": list(keywords),
             "conversationId": conversationId
         }
-        self.prompts["prompts"].append(conversation)
+        self.prompts_data["prompts"].append(conversation)
 
 
 
@@ -60,7 +63,7 @@ class ConversationManager:
         doc = self.nlp(content.lower())
 
         # Filter out punctuation, stopwords, and only keep PROPN and NOUN
-        filtered_tokens = [token for token in doc if not token.is_punct and not token.is_stop and token.pos_ in ["PROPN", "NOUN"]]
+        filtered_tokens = [token for token in doc if not token.is_punct and not token.is_stop and token.pos_ in ["PROPN", "NOUN", "VERB", "ADJ", "ADV"]]
 
         # Perform lemmatization
         lemmatized_words = [token.lemma_ for token in filtered_tokens]
@@ -90,7 +93,7 @@ class ConversationManager:
 
     def find_closest_conversation(self, input_text: str, number_to_return=2, min_similarity_threshold=0) -> List[Dict]:
         tokenized_text = self.tokenize(input_text)
-        conversations = self.prompts
+        conversations = self.prompts_data
 
         collected_conversations = []
 
@@ -133,8 +136,8 @@ class ConversationManager:
 
 
     def find_latest_conversation(self, number_to_return: int) -> List[Dict]:
-        if len(self.prompts["prompts"]) > 0:
-            sliced_list = self.prompts["prompts"][-number_to_return:]
+        if len(self.prompts_data["prompts"]) > 0:
+            sliced_list = self.prompts_data["prompts"][-number_to_return:]
             result = []
             for prompt in sliced_list:
                 conversation = prompt["conversation"]
@@ -149,7 +152,7 @@ class ConversationManager:
         keywords = self.extract_keywords(content_text, 10)
         matched_prompt_ids = set()
 
-        for conv in self.prompts["prompts"]:
+        for conv in self.prompts_data["prompts"]:
             if match_all:
                 if all(keyword in conv["keywords"] for keyword in keywords):
                     matched_prompt_ids.add(conv["id"])
@@ -158,22 +161,49 @@ class ConversationManager:
                     matched_prompt_ids.add(conv["id"])
 
         matched_conversations = [
-            (prompt["id"], item) for prompt in self.prompts["prompts"] if prompt["id"] in matched_prompt_ids for item in prompt["conversation"]]
+            (prompt["id"], item) for prompt in self.prompts_data["prompts"] if prompt["id"] in matched_prompt_ids for item in prompt["conversation"]]
 
         result = []
         for conv_id, conv_item in matched_conversations:
-            parent_prompt = [prompt for prompt in self.prompts["prompts"] if prompt["id"] == conv_id][0]
+            parent_prompt = [prompt for prompt in self.prompts_data["prompts"] if prompt["id"] == conv_id][0]
             conv_item["utc_timestamp"] = parent_prompt["utc_timestamp"]
             result.append(conv_item)
 
         return result
 
+    def get_conversations(self, conversation_id: str) -> List[Dict]:
+        matching_conversations = []
 
-    def save(self, path: str) -> None:
+        for prompt in self.prompts_data["prompts"]:
+            if prompt["conversationId"] == conversation_id:
+                conversation = prompt["conversation"]
+                for conv in conversation:
+                    conv["utc_timestamp"] = prompt["utc_timestamp"]
+                matching_conversations.extend(conversation)
+
+        return matching_conversations
+
+    def get_prompts(self, conversation_id: str) -> List[Dict]:
+        matching_prompts = []
+
+        for prompt in self.prompts_data["prompts"]:
+            if prompt["conversationId"] == conversation_id:
+                matching_prompts.append(prompt)
+
+        return matching_prompts
+
+
+    def get_complete_path(self, base_path, agent_name, account_name):
+        full_path = base_path + '/' + agent_name + '_' + account_name + '_conv.json'
+        return full_path
+
+    def save(self) -> None:
+        path = self.get_complete_path(self.base_path, self.agent_name, self.account_name)
         with open(path, 'w') as f:
-            json.dump(self.prompts, f)
+            json.dump(self.prompts_data, f)
 
 
-    def load(self, path: str) -> None:
+    def load(self) -> None:
+        path = self.get_complete_path(self.base_path, self.agent_name, self.account_name)
         with open(path, 'r') as f:
-            self.prompts = json.load(f)
+            self.prompts_data = json.load(f)
