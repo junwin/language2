@@ -4,6 +4,7 @@ from message_processor import MessageProcessor, FileResponseHandler
 from prompt_manager import PromptManager
 from flask_cors import CORS
 import ssl
+import json
 
 class Agent:
     def __init__(self, seed_conversation, language_code, select_type):
@@ -42,7 +43,8 @@ agents = {
     "maria": Agent(
         seed_conversation=[
             {"role": "system", "content": "You are a super friendly and helpful AI spanish teacher called Maria and like to teach beginers spanish with conversation, role play and find out about your students and things they like."},
-            {"role": "system", "content": "Today is 22th April. we have a dog called Smokey and we are beginners"},
+            {"role": "system", "content": "It is good to findout where the student lives, how old they are, what they like to do and what they like to eat and drink."},
+            {"role": "system", "content": "Today is 29th April. we have a dog called Smokey and we are beginners"},
     ],
         language_code='es-US',
         select_type='latest'
@@ -74,6 +76,24 @@ processors = {}
 
 handler = FileResponseHandler()
 
+
+def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
+    prompt_manager = PromptManager(prompt_base_path, agent_name, account_name, language_code[:2])
+    return prompt_manager
+
+
+def get_message_processor(prompt_base_path, agent_name, account_name, agents, processors):
+    processor_name = get_processor_name(agent_name, account_name)
+    
+    if processor_name not in processors:
+        agent = agents[agent_name]
+        prompt_manager = PromptManager(prompt_base_path, agent_name, account_name, agent.language_code[:2])
+        proc = MessageProcessor(prompt_manager, handler, agent.seed_conversation, agent.select_type, agent.language_code[:2])
+        processors[processor_name] = proc
+    
+    return processors[processor_name]
+
+
 @app.route('/ask', methods=['POST'])
 def ask():
     question = request.json.get('question', '')
@@ -96,16 +116,8 @@ def ask():
     if not select_type:
         select_type = my_agent.select_type
 
-    
-    if processor_name not in processors:
-        agent = agents[agentName]
-        language = agent.language_code[:2]
-        prompt_manager = PromptManager(prompt_base_path, agentName, accountName, language)
-        proc = MessageProcessor(prompt_manager, handler, agent.seed_conversation, select_type, language)
-        processors[processor_name] = proc
+    processor = get_message_processor(prompt_base_path, agentName, accountName, agents, processors)
 
-    
-    processor = processors[processor_name]
   
 
     processor.context_type = select_type
@@ -149,13 +161,8 @@ def post_prompt():
 
     
     
-    if processor_name not in processors:
-        agent = agents[agentName]
-        language = agent.language_code[:2]
-        prompt_manager = PromptManager(prompt_base_path, agentName, accountName, language)
-        processors[processor_name] = MessageProcessor(prompt_manager, handler, agent.seed_conversation, selectType, language)
+    processor = get_message_processor(prompt_base_path, agentName, accountName, agents, processors)
 
-    processor = processors[processor_name]
     processor.context_type = selectType
     prompt = processor.assemble_conversation(query, conversationId, max_prompt_chars=4000, max_prompt_conversations=20)
 
@@ -164,19 +171,58 @@ def post_prompt():
 
     return jsonify(prompt)
 
-
 @app.route('/prompts', methods=['PUT'])
 def put_prompts():
-    # Add the logic to handle the PUT request for prompts here
-    return jsonify({"message": "PUT request for prompts not implemented yet"})
+    agentName = request.args.get('agentName', '').lower()
+    accountName = request.args.get('accountName', '').lower()
+    prompt_id = request.args.get('id', 0, type=int)
+    data = request.get_json()
+
+    #json_string = request.get_data(as_text=True)
+    #data2 = json.loads(json_string)
+
+    if not agentName or not accountName or not prompt_id or not data:
+        return jsonify({"error": "Missing agentName, accountName, or data"}), 400
+
+    if agentName not in agents:
+        return jsonify({"error": "Invalid agentName"}), 400
+
+    agent = agents[agentName]
+      
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
+
+    prompt_manager.load()
+
+    success = prompt_manager.update_prompt(prompt_id, data)
+    if success:
+        prompt_manager.save()
+        return jsonify(data)
+
+    return jsonify({"status": "fail", "message": "Prompt failed to update"})
+
 
 @app.route('/prompts', methods=['DELETE'])
 def delete_prompts():
-    # Add the logic to handle the DELETE request for prompts here
-    return jsonify({"message": "DELETE request for prompts not implemented yet"})
+    agentName = request.args.get('agentName', '').lower()
+    accountName = request.args.get('accountName', '').lower()
+    prompt_id = request.args.get('id', 0, type=int)
 
+    if not agentName or not accountName or not prompt_id:
+        return jsonify({"error": "Missing agentName, accountName, or id"}), 400
 
+    if agentName not in agents:
+        return jsonify({"error": "Invalid agentName"}), 400
 
+    agent = agents[agentName]
+      
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
+    prompt_manager.load()
+    success = prompt_manager.delete_prompt(prompt_id)
+    if success:
+        prompt_manager.save()
+        return jsonify({"status": "success", "message": "Prompt successfully deleted"})
+
+    return jsonify({"status": "fail", "message": "Prompt failed to deleted"})
 
 @app.route('/prompts', methods=['GET'])
 def get_prompts():
@@ -190,7 +236,9 @@ def get_prompts():
     if agentName not in agents:
         return jsonify({"error": "Invalid agentName"}), 400
 
-    prompt_manager = PromptManager(prompt_base_path, agentName, accountName)
+    agent = agents[agentName]
+      
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
     prompt_manager.load()
     prompts = prompt_manager.get_prompts(conversationId)
     return jsonify(prompts)

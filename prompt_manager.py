@@ -57,6 +57,19 @@ class PromptManager:
 
 
 
+    def update_prompt(self, prompt_id: int, updated_prompt: Dict) -> bool:
+        for prompt in self.prompts_data["prompts"]:
+            if prompt["id"] == prompt_id:
+                prompt.update(updated_prompt)
+                return True
+        return False
+
+    def delete_prompt(self, prompt_id: int) -> bool:
+        for index, prompt in enumerate(self.prompts_data["prompts"]):
+            if prompt["id"] == prompt_id:
+                del self.prompts_data["prompts"][index]
+                return True
+        return False
 
     def extract_keywords(self, content: str, top_n: int = 5) -> List[str]:
         # Process the content using SpaCy
