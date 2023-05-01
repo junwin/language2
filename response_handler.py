@@ -9,7 +9,7 @@ class ResponseHandler(ABC):
 
 
 class FileResponseHandler(ResponseHandler):
-    def handle_response(self, response, max_length=500, output_folder="output"):
+    def handle_response(self, response, max_length=1000, output_folder="output"):
         if len(response) > max_length:
             if not os.path.exists(output_folder):
                 os.makedirs(output_folder)

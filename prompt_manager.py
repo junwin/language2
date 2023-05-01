@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict
+from typing import List, Dict, Set
 import time
 import string
 from collections import Counter
@@ -35,8 +35,8 @@ class PromptManager:
         self.base_path = base_path
 
 
-    def store_prompt(self, conversations: List[Dict[str, str]], conversationId) -> None:
-        conversation_id = time.time_ns()
+    def store_prompt_conversations(self, conversations: List[Dict[str, str]], conversationId) -> None:
+        id = time.time_ns()
         utc_timestamp = datetime.utcnow().isoformat() + 'Z'  # ISO 8601 format
         total_chars = sum(len(conv["content"]) for conv in conversations)
         keywords = set()
@@ -46,7 +46,7 @@ class PromptManager:
             keywords |= set(self.extract_keywords(content))
 
         conversation = {
-            "id": conversation_id,
+            "id": id,
             "utc_timestamp": utc_timestamp,  # UTC timestamp as  ISO 8601 - 2019-11-14T00:55:31.820Z
             "total_chars": total_chars,
             "conversation": conversations,
@@ -55,6 +55,27 @@ class PromptManager:
         }
         self.prompts_data["prompts"].append(conversation)
 
+
+    def store_prompt(self, prompt: Dict) -> bool:
+        prompt['id'] = time.time_ns()
+        prompt['utc_timestamp'] = datetime.utcnow().isoformat() + 'Z'
+        prompt['keywords'] = list(self.get_conversation_keywords(prompt['conversation']))
+        prompt['total_chars'] = sum(len(conv['content']) for conv in prompt['conversation'])
+
+        self.prompts_data['prompts'].append(prompt)
+        return True
+
+
+
+    def get_conversation_keywords(self, conversations: List[dict]) -> Set[str]:
+        keywords = set()
+
+        for conv in conversations:
+            content = conv["content"]
+            extracted_keywords = set(self.extract_keywords(content))
+            keywords.update(extracted_keywords)
+
+        return keywords
 
 
     def update_prompt(self, prompt_id: int, updated_prompt: Dict) -> bool:
@@ -139,8 +160,8 @@ class PromptManager:
 
 
 
-    def concatenate_content(self, conversation_data):
-        conversation = conversation_data["conversation"]
+    def concatenate_content(self, prompt):
+        conversation = prompt["conversation"]
         concatenated_content = ""
         for message in conversation:
             concatenated_content += message["content"] + " "
@@ -218,5 +239,21 @@ class PromptManager:
 
     def load(self) -> None:
         path = self.get_complete_path(self.base_path, self.agent_name, self.account_name)
-        with open(path, 'r') as f:
-            self.prompts_data = json.load(f)
+        try:
+            with open(path, 'r') as f:
+                self.prompts_data = json.load(f)
+        except FileNotFoundError:
+            # If the file is not found, set prompts_data to an empty list or default value
+            self.prompts_data = {'prompts': []}
+
+
+    def get_distinct_conversation_ids(self) -> List[str]:
+        conversation_ids = set()
+        for prompt in self.prompts_data['prompts']:
+            conversation_ids.add(prompt['conversationId'])
+        return list(conversation_ids)
+
+    def change_conversation_id(self, old_id: str, new_id: str) -> None:
+        for prompt in self.prompts_data['prompts']:
+            if prompt['conversationId'] == old_id:
+                prompt['conversationId'] = new_id

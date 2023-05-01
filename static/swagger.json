@@ -44,6 +44,51 @@
             "description": "Bad request (missing agentName or accountName)"
           }
         }
+      },
+      "put": {
+        "description": "Rename conversationId",
+        "parameters": [
+          {
+            "name": "agentName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "existingId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "newId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad request (missing existingId or newId)"
+          }
+        }
       }
     },
     "/computeConversations": {

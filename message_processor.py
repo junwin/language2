@@ -35,7 +35,7 @@ class MessageProcessor:
         if not response.startswith("Response is too long"):
             conversation.append({"role": "system", "content": response})
 
-        self.prompt_manager.store_prompt(conversation, conversationId)
+        self.prompt_manager.store_prompt_conversations(conversation, conversationId)
 
         return response
 

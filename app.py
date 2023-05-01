@@ -5,6 +5,8 @@ from prompt_manager import PromptManager
 from flask_cors import CORS
 import ssl
 import json
+from typing import Set
+
 
 class Agent:
     def __init__(self, seed_conversation, language_code, select_type):
@@ -65,6 +67,14 @@ agents = {
         ],
         language_code='es-US',
         select_type='latest'
+    ),
+    "glinda": Agent(
+        seed_conversation=[
+            {"role": "system", "content": "You are Glinda, a kind and wise AI assistant inspired by Glinda from The Wizard of Oz. You guide people on their journey to happiness, reminding them that they already have everything they need."},
+            {"role": "system", "content": "As Glinda, you emphasize the importance of understanding the relationships between circumstances, thoughts, feelings, actions, and results to create meaningful change. You help people address the root causes of their problems by focusing on their thoughts, empowering them to manage their emotions, behaviors, and achieve more desirable outcomes."},
+    ],
+    language_code='es-US',
+    select_type='hydrid'
     ),
  
 }
@@ -142,7 +152,7 @@ def get_agents():
 
 
 
-@app.route('/prompts', methods=['POST'])
+@app.route('/computeConversations', methods=['POST'])
 def post_prompt():
     agentName = request.json.get('agentName', '').lower()
     accountName = request.json.get('accountName', '').lower()
@@ -170,6 +180,40 @@ def post_prompt():
     # prompt = [{"role": "system", "content": "you previously discussed: How do you log to a file in javascript"}]
 
     return jsonify(prompt)
+
+@app.route('/prompts', methods=['POST'])
+def post_prompts():
+    agentName = request.json.get('agentName', '').lower()
+    accountName = request.json.get('accountName', '').lower()
+    selectType = request.json.get('selectType', '').lower()
+    query = request.json.get('query', '')
+    conversationId = request.json.get('conversationId', '')
+    prompt = request.get_json()
+
+    if not agentName or not accountName or not selectType or not query or not conversationId:
+        return jsonify({"error": "Missing agentName, accountName, selectType, query, or conversationId"}), 400
+
+    if agentName not in agents:
+        return jsonify({"error": "Invalid agentName"}), 400
+
+    agent = agents[agentName]
+
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
+
+    prompt_manager.load()
+
+    # add the new prompt to the prompt manager check the bool success to see if it was added
+    success = prompt_manager.store_prompt(prompt)
+
+    if not success:
+        return jsonify({"error": "Failed to store the new prompt"}), 400
+
+    # Save the new prompt
+    prompt_manager.save()
+
+    # Return the newly created prompt
+    return jsonify(prompt)
+
 
 @app.route('/prompts', methods=['PUT'])
 def put_prompts():
@@ -242,6 +286,49 @@ def get_prompts():
     prompt_manager.load()
     prompts = prompt_manager.get_prompts(conversationId)
     return jsonify(prompts)
+
+
+@app.route('/conversationIds', methods=['GET'])
+def get_conversation_ids():
+    agentName = request.args.get('agentName', '').lower()
+    accountName = request.args.get('accountName', '').lower()
+
+    if not agentName or not accountName:
+        return jsonify({"error": "Missing agentName or accountName"}), 400
+
+    if agentName not in agents:
+        return jsonify({"error": "Invalid agentName"}), 400
+
+    agent = agents[agentName]
+
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
+    prompt_manager.load()
+    conversation_ids = prompt_manager.get_distinct_conversation_ids()
+    return jsonify(conversation_ids)
+
+
+
+
+@app.route('/conversationIds', methods=['PUT'])
+def change_conversation_id():
+    agentName = request.args.get('agentName', '').lower()
+    accountName = request.args.get('accountName', '').lower()
+    existingId = request.args.get('existingId', '')
+    newId = request.args.get('newId', '')
+
+    if not agentName or not accountName or not existingId or not newId:
+        return jsonify({"error": "Missing agentName, accountName, existingId, or newId"}), 400
+
+    if agentName not in agents:
+        return jsonify({"error": "Invalid agentName"}), 400
+
+    agent = agents[agentName]
+
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
+    prompt_manager.load()
+    prompt_manager.change_conversation_id(existingId, newId)
+    prompt_manager.save()
+    return jsonify({"message": "Conversation ID changed successfully"})
 
 
 def get_complete_path(base_path, agent_name, account_name):
