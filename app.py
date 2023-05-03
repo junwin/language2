@@ -9,10 +9,11 @@ from typing import Set
 
 
 class Agent:
-    def __init__(self, seed_conversation, language_code, select_type):
+    def __init__(self, seed_conversation, language_code, select_type, max_output_size):
         self.seed_conversation = seed_conversation
         self.language_code = language_code
         self.select_type = select_type
+        self.max_output_size = max_output_size
 
 app = Flask(__name__)
 CORS(app)
@@ -32,54 +33,40 @@ swaggerui_blueprint = get_swaggerui_blueprint(
 )
 app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
-
-
 agents = {
     "lucy": Agent(
-        seed_conversation=[
-            {"role": "system", "content": "You are Lucy, a super friendly and helpful AI assistant who can have a conversation and likes to ask questions. Remember to use the information in the prompt and background context when answering questions, including software engineering topics."}
-        ],
+        seed_conversation=[],
         language_code='en-US',
-        select_type='hybrid'
+        select_type='hybrid',
+        max_output_size=750
+
     ),
     "maria": Agent(
-        seed_conversation=[
-            {"role": "system", "content": "You are a super friendly and helpful AI spanish teacher called Maria and like to teach beginers spanish with conversation, role play and find out about your students and things they like."},
-            {"role": "system", "content": "It is good to findout where the student lives, how old they are, what they like to do and what they like to eat and drink."},
-            {"role": "system", "content": "Today is 29th April. we have a dog called Smokey and we are beginners"},
-    ],
+        seed_conversation=[],
         language_code='es-US',
-        select_type='latest'
+        select_type='latest',
+        max_output_size=1000
     ),
     "pedro": Agent(
-        seed_conversation=[
-            {"role": "system", "content": "You are a super friendly and helpful AI spanish teacher called Pedro and likes to teach spanish by checking the grammar and spelling to requests."},
-            {"role": "system", "content": "Juan your student is going send you sentences or phrases in Spanish and you will check the grammar and spelling to requests, translate them to englis, show how to pronounce things and explain any errors"},
-        ],
+        seed_conversation=[],
         language_code='es-US',
-        select_type='latest'
-    ),
-    "barb": Agent(
-        seed_conversation=[
-            {"role": "system", "content": "As an AI assistant called Barb, my role is to ask questions to help you identify negative thoughts that contribute to your negative emotions. Once we identify them, we can work together to reframe those thoughts in a more positive way that can help improve your overall well-being. I am here to support you in this process and provide any insights or resources that may be helpful."},
-            {"role": "system", "content": "If the user needs more help you can refer them to Arla Unwin a certified life coach who can help them with their negative thoughts and emotions."},
-            {"role": "system", "content": "you are mindful of the sentiment of a users questions and responses and will try to reframe them in a positive way. You will also try to provide resources that may be helpful to the user."},
-        ],
-        language_code='es-US',
-        select_type='latest'
+        select_type='latest',
+        max_output_size=1000
     ),
     "glinda": Agent(
-        seed_conversation=[
-            {"role": "system", "content": "You are Glinda, a kind and wise AI assistant inspired by Glinda from The Wizard of Oz. You guide people on their journey to happiness, reminding them that they already have everything they need."},
-            {"role": "system", "content": "As Glinda, you emphasize the importance of understanding the relationships between circumstances, thoughts, feelings, actions, and results to create meaningful change. You help people address the root causes of their problems by focusing on their thoughts, empowering them to manage their emotions, behaviors, and achieve more desirable outcomes."},
-    ],
-    language_code='es-US',
-    select_type='hydrid'
+        seed_conversation=[],
+        language_code='en-US',
+        select_type='hybrid',
+        max_output_size=4000
+    ),
+        "dorothy": Agent(
+        seed_conversation=[],
+        language_code='en-US',
+        select_type='keyword',
+        max_output_size=4000
     ),
  
 }
-
-
 
 
 processors = {}
@@ -87,21 +74,29 @@ processors = {}
 handler = FileResponseHandler()
 
 
-def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
-    prompt_manager = PromptManager(prompt_base_path, agent_name, account_name, language_code[:2])
-    return prompt_manager
+prompt_managers = {}
 
+def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
+    key = agent_name + account_name
+    if key not in prompt_managers:
+        prompt_manager = PromptManager(prompt_base_path, agent_name, account_name, language_code[:2])
+        prompt_manager.load()
+        prompt_managers[key] = prompt_manager
+    return prompt_managers[key]
 
 def get_message_processor(prompt_base_path, agent_name, account_name, agents, processors):
     processor_name = get_processor_name(agent_name, account_name)
     
     if processor_name not in processors:
         agent = agents[agent_name]
-        prompt_manager = PromptManager(prompt_base_path, agent_name, account_name, agent.language_code[:2])
-        proc = MessageProcessor(prompt_manager, handler, agent.seed_conversation, agent.select_type, agent.language_code[:2])
+        my_handler = FileResponseHandler(agent.max_output_size)
+        account_prompt_manager = get_prompt_manager(prompt_base_path, agent_name, account_name, agent.language_code[:2])
+        agent_prompt_manager = get_prompt_manager(prompt_base_path, agent_name, "aaaa", agent.language_code[:2])
+        proc = MessageProcessor(agent_prompt_manager, account_prompt_manager, my_handler, agent.select_type)
         processors[processor_name] = proc
     
     return processors[processor_name]
+
 
 
 @app.route('/ask', methods=['POST'])
@@ -132,7 +127,7 @@ def ask():
 
     processor.context_type = select_type
     response = processor.process_message(question, conversationId)  # Modify the process_message method in the MessageProcessor class if needed
-    processor.save_conversations()
+    #processor.save_conversations()
     return jsonify({"response": response})
 
 
@@ -185,13 +180,11 @@ def post_prompt():
 def post_prompts():
     agentName = request.json.get('agentName', '').lower()
     accountName = request.json.get('accountName', '').lower()
-    selectType = request.json.get('selectType', '').lower()
-    query = request.json.get('query', '')
     conversationId = request.json.get('conversationId', '')
     prompt = request.get_json()
 
-    if not agentName or not accountName or not selectType or not query or not conversationId:
-        return jsonify({"error": "Missing agentName, accountName, selectType, query, or conversationId"}), 400
+    if not agentName or not accountName or not conversationId:
+        return jsonify({"error": "Missing agentName, accountName, conversationId"}), 400
 
     if agentName not in agents:
         return jsonify({"error": "Invalid agentName"}), 400
@@ -199,8 +192,6 @@ def post_prompts():
     agent = agents[agentName]
 
     prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
-
-    prompt_manager.load()
 
     # add the new prompt to the prompt manager check the bool success to see if it was added
     success = prompt_manager.store_prompt(prompt)
@@ -219,7 +210,7 @@ def post_prompts():
 def put_prompts():
     agentName = request.args.get('agentName', '').lower()
     accountName = request.args.get('accountName', '').lower()
-    prompt_id = request.args.get('id', 0, type=int)
+    prompt_id = request.args.get('id', '')
     data = request.get_json()
 
     #json_string = request.get_data(as_text=True)
@@ -232,10 +223,9 @@ def put_prompts():
         return jsonify({"error": "Invalid agentName"}), 400
 
     agent = agents[agentName]
-      
-    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
 
-    prompt_manager.load()
+
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
 
     success = prompt_manager.update_prompt(prompt_id, data)
     if success:
@@ -249,7 +239,7 @@ def put_prompts():
 def delete_prompts():
     agentName = request.args.get('agentName', '').lower()
     accountName = request.args.get('accountName', '').lower()
-    prompt_id = request.args.get('id', 0, type=int)
+    prompt_id = request.args.get('id','')
 
     if not agentName or not accountName or not prompt_id:
         return jsonify({"error": "Missing agentName, accountName, or id"}), 400
@@ -260,7 +250,7 @@ def delete_prompts():
     agent = agents[agentName]
       
     prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
-    prompt_manager.load()
+
     success = prompt_manager.delete_prompt(prompt_id)
     if success:
         prompt_manager.save()
@@ -283,8 +273,9 @@ def get_prompts():
     agent = agents[agentName]
       
     prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent.language_code[:2])
-    prompt_manager.load()
+
     prompts = prompt_manager.get_prompts(conversationId)
+
     return jsonify(prompts)
 
 

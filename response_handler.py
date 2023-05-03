@@ -4,13 +4,15 @@ from abc import ABC, abstractmethod
 
 class ResponseHandler(ABC):
     @abstractmethod
-    def handle_response(self, response, max_length=500, output_folder="output"):
+    def handle_response(self, response, output_folder="output"):
         pass
 
 
 class FileResponseHandler(ResponseHandler):
-    def handle_response(self, response, max_length=1000, output_folder="output"):
-        if len(response) > max_length:
+    def __init__(self, max_length=500):
+        self.max_length = max_length
+    def handle_response(self, response, output_folder="output"):
+        if len(response) > self.max_length:
             if not os.path.exists(output_folder):
                 os.makedirs(output_folder)
 

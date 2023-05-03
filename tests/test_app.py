@@ -29,7 +29,7 @@ def test_post_prompts(client):
         "selectType": "recent",
         "query": "what is the meaning of life?",
         "conversationId": "tc1",
-        "id": 1682546435750517801,
+        "id": "1682546435750517801",
         "utc_timestamp": "2023-04-26T22:00:35.750517Z",
         "total_chars": 312,
         "conversation": [
