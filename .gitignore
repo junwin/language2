@@ -27,9 +27,6 @@ coverage
 *.sln
 *.sw?
 venv
-Maria*
-Lucy*
-Pedro*
 static/assets
 static/*.html
 static/*.ico
@@ -38,6 +35,12 @@ conversations.json
 *.pyc
 output/response_1.txt
 output/*.txt
-data/prompts/*.json
-data/prompts/barb_junwin_conv.json
 test.json
+output/*.html
+data/prompts/dorothy_junwin_conv.json
+data/prompts/dorothy_test_conv.json
+data/prompts/lucy_junwin_conv.json
+data/prompts/maria_junwin_conv.json
+data/prompts/pedro_junwin_conv.json
+data/prompts/pedro_test_conv.json
+data/prompts/lucy_test_conv.json

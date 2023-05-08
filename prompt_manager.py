@@ -19,6 +19,7 @@ nltk.download('wordnet')
 nltk.download('punkt')
 
 
+
 class PromptManager:
     def __init__(self, base_path, agent_name, account_name, language_code = "en"):
         self.prompts_data = {"prompts": []}
@@ -34,6 +35,25 @@ class PromptManager:
         self.agent_name = agent_name
         self.account_name = account_name
         self.base_path = base_path
+
+
+    prompt_managers = {}
+
+    @staticmethod
+    def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
+        key = PromptManager.get_key(agent_name, account_name)
+        if key not in PromptManager.prompt_managers:
+            prompt_manager = PromptManager(
+                prompt_base_path, agent_name, account_name, language_code[:2])
+            prompt_manager.load()
+            PromptManager.prompt_managers[key] = prompt_manager
+        return PromptManager.prompt_managers[key]
+    
+    @staticmethod
+    def get_key(agent_name, account_name):
+        key = agent_name + account_name
+        return key
+
 
     def get_id(self) -> str:
         return str(time.time_ns()) 
@@ -128,8 +148,8 @@ class PromptManager:
         concatenated_keywords = " ".join(keywords)
         return concatenated_keywords
 
-    def tokenize(self, text):
-        return nltk.word_tokenize(text)
+    #def tokenize(self, text):
+     #   return nltk.word_tokenize(text)
 
     def semantic_similarity(self, set1, set2):
         vectorizer = TfidfVectorizer()
@@ -138,9 +158,9 @@ class PromptManager:
 
 
     def find_closest_promptIds(self, input_text: str, number_to_return=2, min_similarity_threshold=0) -> List[str]:
-        my_keywords = self.extract_keywords(input_text)
-        tokenized_text = self.tokenize(input_text)
-        tokenized_text = my_keywords
+        tokenized_text = self.extract_keywords(input_text)
+        #tokenized_text = self.tokenize(input_text)
+        #tokenized_text = my_keywords
         prompts = self.prompts_data["prompts"]
 
         prompt_similarities = []
@@ -148,7 +168,7 @@ class PromptManager:
         for prompt in prompts:
             concat_text = self.concatenate_content(prompt)
             concatenate_keywords = self.concatenate_keywords(prompt)
-            similarity = self.semantic_similarity(tokenized_text, self.tokenize(concatenate_keywords))
+            similarity = self.semantic_similarity(tokenized_text, self.extract_keywords(concatenate_keywords))
 
             if similarity > min_similarity_threshold:
                 prompt_similarities.append((prompt["id"], similarity))
@@ -172,39 +192,7 @@ class PromptManager:
 
 
 
-    def find_closest_conversation(self, input_text: str, number_to_return=2, min_similarity_threshold=0) -> List[Dict]:
-        tokenized_text = self.tokenize(input_text)
-        conversations = self.prompts_data
-
-        collected_conversations = []
-
-        for prompt in conversations["prompts"]:
-            concat_text = self.concatenate_content(prompt)
-            concatenate_keywords = self.concatenate_keywords(prompt)
-            # similarity = self.semantic_similarity(tokenized_text, prompt["keywords"])
-            # similarity = self.semantic_similarity(tokenized_text, self.tokenize(concat_text))
-            similarity = self.semantic_similarity(tokenized_text, self.tokenize(concatenate_keywords))
-            # print (similarity)
-            # print (concat_text)
-            if similarity > min_similarity_threshold:
-                # Copy the conversation and add the similarity and utc_timestamp
-                conversation = [conv.copy() for conv in prompt["conversation"]]
-                for conv in conversation:
-                    conv["utc_timestamp"] = prompt["utc_timestamp"]
-                    conv["similarity"] = similarity
-
-                collected_conversations.append(conversation)
-
-        # Flatten the list of conversations and sort by similarity
-        flat_conversations = [conv for sublist in collected_conversations for conv in sublist]
-        sorted_conversations = sorted(flat_conversations, key=lambda x: x["similarity"], reverse=True)
-
-        # Select and return the N conversations with the highest similarities
-        return sorted_conversations[:number_to_return]
-
-
-
-
+ 
 
 
     def concatenate_content(self, prompt):
@@ -235,41 +223,8 @@ class PromptManager:
 
         return matched_prompt_ids_list
 
-    def find_latest_conversation(self, number_to_return: int) -> List[Dict]:
-        if len(self.prompts_data["prompts"]) > 0:
-            sliced_list = self.prompts_data["prompts"][-number_to_return:]
-            result = []
-            for prompt in sliced_list:
-                conversation = prompt["conversation"]
-                for conv in conversation:
-                    conv["utc_timestamp"] = prompt["utc_timestamp"]
-                result.extend(conversation)
-            return result
-        return []
-
-
-    def get_conversations(self, content_text: str, match_all=False) -> List[Dict]:
-        keywords = self.extract_keywords(content_text, 10)
-        matched_prompt_ids = set()
-
-        for conv in self.prompts_data["prompts"]:
-            if match_all:
-                if all(keyword in conv["keywords"] for keyword in keywords):
-                    matched_prompt_ids.add(conv["id"])
-            else:
-                if any(keyword in conv["keywords"] for keyword in keywords):
-                    matched_prompt_ids.add(conv["id"])
-
-        matched_conversations = [
-            (prompt["id"], item) for prompt in self.prompts_data["prompts"] if prompt["id"] in matched_prompt_ids for item in prompt["conversation"]]
-
-        result = []
-        for conv_id, conv_item in matched_conversations:
-            parent_prompt = [prompt for prompt in self.prompts_data["prompts"] if prompt["id"] == conv_id][0]
-            conv_item["utc_timestamp"] = parent_prompt["utc_timestamp"]
-            result.append(conv_item)
-
-        return result
+    def create_conversation_item(self, content_text: str, role: str) -> List[Dict]:
+        return [{"role": role, "content": content_text}]
 
 
     def get_conversations_ids(self, ids: List[str]) -> List[Dict]:
@@ -282,17 +237,7 @@ class PromptManager:
 
         return matching_conversations
 
-    def get_conversations(self, conversation_id: str) -> List[Dict]:
-        matching_conversations = []
 
-        for prompt in self.prompts_data["prompts"]:
-            if prompt["conversationId"] == conversation_id:
-                conversation = prompt["conversation"]
-                for conv in conversation:
-                    conv["utc_timestamp"] = prompt["utc_timestamp"]
-                matching_conversations.extend(conversation)
-
-        return matching_conversations
 
     def get_prompts(self, conversation_id: str) -> List[Dict]:
         matching_prompts = []
@@ -300,6 +245,15 @@ class PromptManager:
         for prompt in self.prompts_data["prompts"]:
             if prompt["conversationId"] == conversation_id:
                 matching_prompts.append(prompt)
+
+        return matching_prompts
+    
+    def get_promptIds_with_converation_id(self, conversation_id: str) :
+        matching_prompts = []
+
+        for prompt in self.prompts_data["prompts"]:
+            if prompt["conversationId"] == conversation_id:
+                matching_prompts.append(prompt["id"])
 
         return matching_prompts
 
@@ -323,19 +277,39 @@ class PromptManager:
 
         return conversation_text
     
-    def get_formatted_text(self, source_text: Dict[str, str]) -> str:
-        formatted_text = ""
-        for key, value in source_text.items():
-            formatted_text += f"{key}: {value}\n"
-        return formatted_text.strip()
+    def format_dialog(self, dialogs, user_intro="the user said", agent_intro="the agent said", system_intro="the system said"):
+        response = ""
+        
+        for dialog in dialogs:
+            role = dialog.get("role", "")
+            content = dialog.get("content", "")
+            
+            if role == "user":
+                response += f'{user_intro} "{content}"'
+            elif role == "system":
+                response += f'{system_intro} "{content}"'
+            elif role == "assistant":
+                response += f'{agent_intro} "{content}"'
+            
+            response += ", "
+        
+        response = response.rstrip(", ") + "\n"
+        return response
+        
+    def get_formatted_dialog( self, promptIds: List[str]) -> str:
+        response_text = ""
+        for promptId in promptIds:
+            prompt = self.get_prompt(promptId)
+            if len(prompt) > 0:
+                response_text += self.format_dialog(prompt["conversation"])
+
+        return response_text
+
 
     def get_conversation_text_by_id(self, conversation_id: str, separator="--") -> str:
         response_text = ""
-        prompts = self.get_prompts(conversation_id)
-        for prompt in prompts:
-            myText = self.get_formatted_text(self.get_conversation_text(prompt))
-            response_text += f"{myText}\n"
-            
+        ids = prompts = self.get_promptIds_with_converation_id(conversation_id) 
+        response_text = self.get_formatted_dialog( ids)
         return response_text
         
 

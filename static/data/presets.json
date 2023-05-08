@@ -1,0 +1,33 @@
+{
+    "paralleltext": {
+        "name": "paralleltext",
+        "info": "/paralleltext, oliver twist, chapter 2, 12 year old, Spanish, 20 sentences, Vocabulary: add a vocabulary list from the translated text",
+        "num_mandatory_params": 5,
+        "prompt": "Please summarize  #<P2> of the #<P1> then transform the summary text into around #<P5> in a simple English style that a #<P3> could read; this is the simplified text, and translate that simplified text to #<P4> - the translated text.  \n\nUse the following output Format:\nSimplified: <simplified_text>\n\n\nTranslation: <translated_text> \n\n#<P6>"
+    },
+    "getrelevantfacts": {
+        "name": "getrelevantfacts",
+        "info": "/getrelevantfacts, lots of info and facts, some request",
+        "num_mandatory_params": 2,
+        "prompt": "Please carefully review the info delimited by triple backticks and the user request delimited by triple quotes '''. Then, follow these steps:\n1) Identify any statements of facts, actions, preferences or points of view in the info that are related to the user request into a list; this is useful information. If there is no related information, then useful information is set to NONE\n2) If no useful information is found then we should return NONE\n3) Remove any duplicate information from the useful information\n\nUse the following output Format:\\nUseful information: <useful information>\n\ninfo:#<P1>```\nuser request: '''#<P2>'''\n"
+    },
+    "gpt-4": {
+        "name": "gpt-4",
+        "info": "/gpt-4,  your free format request",
+        "num_mandatory_params": 1,
+        "prompt": "#<P1>"
+    },
+    "gpt-3.5": {
+        "name": "gpt-3.5",
+        "info": "/gpt-3.5,  your free format request",
+        "num_mandatory_params": 1,
+        "prompt": "#<P1>"
+    },
+    "conjugate": {
+        "name": "conjugate",
+        "info": "/conjugate, spanish, conocer",
+        "num_mandatory_params": 2,
+        "prompt": "please conjugate #<P2> in #<P1>  in a single table showing present, preterite, Imperfect going acros the top and pronouns down the side and output the table in markdown format",
+        "model": "gpt-3.5-turbo"
+    }
+}
