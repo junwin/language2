@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_swagger_ui import get_swaggerui_blueprint
-from message_processor import MessageProcessor, FileResponseHandler
+from message_processor_store import MessageProcessorStore
+from response_handler import FileResponseHandler
 from prompt_manager import PromptManager
+from prompt_store import PromptStore
 from agent_manager import AgentManager
-from prompts import Prompts
-from prompts_module import PromptsModule
+from preset_prompts import PresetPrompts
+
 
 from flask_cors import CORS
 import ssl
@@ -13,10 +15,11 @@ from typing import Set
 import logging
 
 from injector import Injector
-from agent_manager_module import AgentManagerModule
+
 
 from container_config import container
 from config_manager import ConfigManager
+from message_processor_store import MessageProcessorStore
 
 
 
@@ -53,7 +56,7 @@ swaggerui_blueprint = get_swaggerui_blueprint(
 app.register_blueprint(swaggerui_blueprint, url_prefix=config.get("swagger_url", "/api/docs"))
 
 
-processors = {}
+message_processor_store = MessageProcessorStore()
 
 
 
@@ -65,19 +68,19 @@ agent_manager.load_agents()
 
 
 # Get the Prompts instance
-preset_prompts = container.get(Prompts)
+preset_prompts = container.get(PresetPrompts)
 preset_prompts.load()
 
 
 
 
 def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
-    return PromptManager.get_prompt_manager(prompt_base_path, agent_name, account_name, language_code)
+    prompt_store = container.get(PromptStore)
+    return prompt_store.get_prompt_manager(agent_name, account_name, language_code)
    
 
-def get_message_processor(prompt_base_path, agent_name, account_name, agents, processors):
-
-    manager=MessageProcessor.get_message_processor(agent_name, account_name, handler, prompt_base_path="data/prompts")
+def get_message_processor(agent_name, account_name):
+    manager=message_processor_store.get_message_processor(agent_name, account_name)
     return manager
 
 
@@ -105,8 +108,7 @@ def ask():
     if not select_type:
         select_type = my_agent['select_type']
     agents = agent_manager.get_available_agents()
-    processor = get_message_processor(
-        prompt_base_path, agentName, accountName, agents, processors)
+    processor = get_message_processor(agentName, accountName)
 
     processor.context_type = select_type
     # Modify the process_message method in the MessageProcessor class if needed
@@ -177,8 +179,7 @@ def post_prompts():
 
     agent = agent_manager.get_agent(agentName)
 
-    prompt_manager = get_prompt_manager(
-        prompt_base_path, agentName, accountName, agent['language_code'][:2])
+    prompt_manager = get_prompt_manager( prompt_base_path, agentName, accountName, agent['language_code'][:2])
 
     # add the new prompt to the prompt manager check the bool success to see if it was added
     success = prompt_manager.store_prompt(prompt)
@@ -211,8 +212,7 @@ def put_prompts():
 
     agent = agent_manager.get_agent(agentName)
 
-    prompt_manager = get_prompt_manager(
-        prompt_base_path, agentName, accountName, agent['language_code'][:2])
+    prompt_manager = get_prompt_manager( prompt_base_path, agentName, accountName, agent['language_code'][:2])
 
     success = prompt_manager.update_prompt(prompt_id, data)
     if success:
@@ -236,8 +236,7 @@ def delete_prompts():
 
     agent = agent_manager.get_agent(agentName)
 
-    prompt_manager = get_prompt_manager(
-        prompt_base_path, agentName, accountName, agent['language_code'][:2])
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent['language_code'][:2])
 
     success = prompt_manager.delete_prompt(prompt_id)
     if success:
@@ -261,8 +260,7 @@ def get_prompts():
 
     agent = agent_manager.get_agent(agentName)
 
-    prompt_manager = get_prompt_manager(
-        prompt_base_path, agentName, accountName, agent['language_code'][:2])
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent['language_code'][:2])
 
     prompts = prompt_manager.get_prompts(conversationId)
 
@@ -282,9 +280,8 @@ def get_conversation_ids():
 
     agent = agent_manager.get_agent(agentName)
 
-    prompt_manager = get_prompt_manager(
-        prompt_base_path, agentName, accountName, agent['language_code'][:2])
-    prompt_manager.load()
+    prompt_manager = get_prompt_manager( prompt_base_path, agentName, accountName, agent['language_code'][:2])
+    # prompt_manager.load()
     conversation_ids = prompt_manager.get_distinct_conversation_ids()
     return jsonify(conversation_ids)
 
@@ -304,8 +301,7 @@ def change_conversation_id():
 
     agent = agent_manager.get_agent(agentName)
 
-    prompt_manager = get_prompt_manager(
-        prompt_base_path, agentName, accountName, agent['language_code'][:2])
+    prompt_manager = get_prompt_manager(prompt_base_path, agentName, accountName, agent['language_code'][:2])
     prompt_manager.load()
     prompt_manager.change_conversation_id(existingId, newId)
     prompt_manager.save()

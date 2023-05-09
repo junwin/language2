@@ -40,7 +40,7 @@ class PromptManager:
     prompt_managers = {}
 
     @staticmethod
-    def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
+    def get_prompt_managerzzz(prompt_base_path, agent_name, account_name, language_code):
         key = PromptManager.get_key(agent_name, account_name)
         if key not in PromptManager.prompt_managers:
             prompt_manager = PromptManager(
@@ -57,6 +57,18 @@ class PromptManager:
 
     def get_id(self) -> str:
         return str(time.time_ns()) 
+    
+    def is_none_or_empty(self, string):
+        return string is None or string.strip() == ""
+    
+    def add_response_message(self, conversationId: str, request: str, response: str):
+        conversation = []
+        if  not self.is_none_or_empty(request):
+            conversation.append({"role": "user", "content": request})
+        if not self.is_none_or_empty(response):
+            conversation.append({"role": "assistant", "content": response})
+
+        self.store_prompt_conversations(conversation, conversationId)
 
     def store_prompt_conversations(self, conversations: List[Dict[str, str]], conversationId) -> None:
         id = self.get_id()

@@ -1,60 +1,40 @@
 import openai
 import logging
+from prompt_store import PromptStore
 from prompt_manager import PromptManager
-from response_handler import ResponseHandler
+
 from response_handler import FileResponseHandler
 from agent_manager import AgentManager
 from message_preProcess import MessagePreProcess
 from api_helpers import ask_question, get_completion
-from prompts import Prompts
+from preset_prompts import PresetPrompts
 import re
 from injector import Injector
 from container_config import container
-
+from config_manager import ConfigManager   
+ 
 
 
 
 class MessageProcessor:
-    def __init__(self, agent_prompt_manager: PromptManager, account_prompt_manager: PromptManager, handler, context_type):
+    def __init__(self, agent_name: str, account_name :str ):
         # self.name = name
-        self.agent_prompt_manager = agent_prompt_manager
-        self.account_prompt_manager = account_prompt_manager
-        self.seed_conversations = []
-        self.context_type = context_type
-        self.handler = handler
-        self.preprocessor = MessagePreProcess()
-        # self.open_conversations()
-        # Get the AgentManager instance
-
-
-
-    processors = {}
-
-    @staticmethod
-    def get_message_processor(agent_name: str, account_name: str, handler: FileResponseHandler, prompt_base_path="data/prompts"):
-        processor_name = MessageProcessor.get_processor_name(agent_name, account_name)
-
-        logging.info(f'get_message_processor: {processor_name}')
         agent_manager = container.get(AgentManager)
+        self.agent = agent_manager.get_agent(agent_name)
+        self.config = container.get(ConfigManager) 
+        prompt_base_path=self.config.get('prompt_base_path')  
+        prompt_store = container.get(PromptStore)
+        self.account_prompt_manager = prompt_store.get_prompt_manager(self.agent['name'], account_name, self.agent['language_code'][:2])
+        self.agent_prompt_manager = prompt_store.get_prompt_manager(self.agent['name'], self.config.get("agent_internal_account_name"), self.agent['language_code'][:2])   
+         
+        self.seed_conversations = []
+        self.context_type = self.agent["select_type"]
+        self.handler = container.get(FileResponseHandler)   
+        self.preprocessor = container.get(MessagePreProcess)
 
-        if processor_name not in MessageProcessor.processors:
-            
-            agent = agent_manager.get_agent(agent_name)
 
-            my_handler = FileResponseHandler(agent['max_output_size'])
 
-            account_prompt_manager = PromptManager.get_prompt_manager(prompt_base_path, agent_name, account_name, agent['language_code'][:2])
-            agent_prompt_manager = PromptManager.get_prompt_manager(prompt_base_path, agent_name, "aaaa", agent['language_code'][:2])
-
-            proc = MessageProcessor(agent_prompt_manager, account_prompt_manager, my_handler, agent['select_type'])
-            MessageProcessor.processors[processor_name] = proc
-
-        return MessageProcessor.processors[processor_name]
-
-    @staticmethod
-    def get_processor_name(agent_name, account_name):
-        processor_name = agent_name + '_' + account_name
-        return processor_name
+  
 
     
 
@@ -69,6 +49,9 @@ class MessageProcessor:
         myResult = self.preprocessor.alternative_processing(message, conversationId, agent, self.account_prompt_manager)
 
         if myResult["action"] == "return":
+            return myResult["result"]
+        if myResult["action"] == "storereturn":
+            self.add_response_message(conversationId,  message, myResult["result"])
             return myResult["result"]
         elif myResult["action"] == "continue":
              message = myResult["result"]

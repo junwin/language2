@@ -5,18 +5,16 @@ from response_handler import ResponseHandler
 from response_handler import FileResponseHandler
 from agent_manager import AgentManager
 from api_helpers import ask_question, get_completion
-from prompts import Prompts
+from preset_prompts import PresetPrompts
 import re
 from typing import List, Dict, Set
 import json
 import logging
-from injector import Injector
-from container_config import container
 
 class MessagePreProcess:
 
-    def __init__(self):
-        self.preset_prompts = container.get(Prompts)
+    def __init__(self, preset_prompts: PresetPrompts):
+        self.preset_prompts = preset_prompts
        
        
 
@@ -33,11 +31,11 @@ class MessagePreProcess:
             response["result"] = myResult
         elif message.startswith("/"):
             response["action"] = "return"
-            response["result"] = self.process_preset_prompt(message)
+            response["result"] = self.process_preset_prompt(message, account_prompt_manager)
  
         return response
     
-    def process_preset_prompt(self, message)  -> str: 
+    def process_preset_prompt(self, message, account_prompt_manager)  -> str: 
         myResult = self.transform_to_dict(message, 1)
         preset_name = myResult["seedName"]
         prompt = self.preset_prompts.get_prompt(preset_name)
@@ -52,7 +50,7 @@ class MessagePreProcess:
         preset_name = myResult["seedName"]
 
         if preset_name == "eft_data_chunker":
-            response = self.etf_chunker(message)
+            response = self.etf_chunker(message, account_prompt_manager)
             return response
         
         return self.process_preset_prompt_values(preset_name, values)
@@ -134,7 +132,7 @@ class MessagePreProcess:
 
         return "continue", new_request
     
-    def etf_chunker(self, message)  -> str: 
+    def etf_chunker(self, message, account_prompt_manager:PromptManager)  -> str: 
 
         # this just gets to the prompt name - we dont know how many parameters there are
         myResult = self.transform_to_dict(message, 1)
@@ -163,15 +161,24 @@ class MessagePreProcess:
         else:
             analysis_instructions = ""
 
-        response = self.process_json_chunks(file_path, chunk_size, preset_name_chunk, preset_name_analysis, analysis_instructions)
+        digest = self.process_json_chunks(file_path, chunk_size, preset_name_chunk, preset_name_analysis, analysis_instructions)
 
-        return response
+        account_prompt_manager.add_response_message(preset_name, preset_name + " " + "digest", digest)
+
+        analysis = self.process_preset_prompt_values(preset_name_analysis, [digest, analysis_instructions])
+
+        account_prompt_manager.add_response_message(preset_name, preset_name + " " + "analysis", analysis)
+        account_prompt_manager.save()
+        
+        logging.info(f'analysis: {analysis}')
+
+        return analysis
 
     def read_chunks(self, data, chunk_size):
         for i in range(0, len(data), chunk_size):
             yield data[i:i + chunk_size]
 
-    def process_json_chunks(self, file_path, chunk_size, preset_name_chunk, preset_name_analysis, analysis_instructions=''):
+    def process_json_chunks(self, file_path, chunk_size, preset_name_chunk, preset_name_analysis, analysis_instructions='')  -> str :
         logging.info(f'process_json_chunks: start')
 
         with open(file_path, 'r') as file:
@@ -190,9 +197,8 @@ class MessagePreProcess:
         print('all chunks processed')
         print('starting analysis')
         logging.info(f'digest: {digest}')
-        analysis = self.process_preset_prompt_values(preset_name_analysis, [digest, analysis_instructions])
         print('done')
-        logging.info(f'analysis: {analysis}')
+
         logging.info(f'process_json_chunks: end')
-        return analysis
+        return digest
 

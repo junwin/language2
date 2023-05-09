@@ -53,7 +53,7 @@
         "name": "eft_metrics_extract",
         "info": "/eft_metrics_extract, json for upto 3 ETFs",
         "num_mandatory_params": 1,
-        "prompt": "Given a list of JSON objects representing stock data for up to 3 stocks, provide a summary of key metrics for each stock, including previous close, open, volume, average volume, yield, total assets, beta3Year, YTD return, and three-year average return. Here is the input data: #<P1>",
+        "prompt": "Given a list of JSON objects representing stock data for 1 to 3 stocks, provide a summary of key metrics for each stock, including previous close, open, volume, average volume, yield, total assets, beta3Year, YTD return, and three-year average return. Here is the input data: #<P1>",
         "model": "gpt-3.5-turbo"
     },
     "eft_analize_metrics": {

@@ -1,11 +1,78 @@
 # container_config.py
 
 from injector import Injector
-from agent_manager_module import AgentManagerModule
-from prompts_module import PromptsModule
+from injector import Module, provider, singleton
+from injector import inject
+from preset_prompts import PresetPrompts
+from config_manager import ConfigManager
+#from message_processor_store import  MessageProcessorStore
+from message_preProcess import MessagePreProcess
+from agent_manager import AgentManager
+#from prompt_manager import PromptManager
+from prompt_store import PromptStore
+from response_handler import FileResponseHandler 
+
+
+
+
+config = ConfigManager('config.json')
+
+
+class ConfigManagerModule(Module):
+    @provider
+    @singleton
+    def provide_prompts(self) -> ConfigManager:
+        return ConfigManager('config.json')
+
+class PromptStoreModule(Module):
+    @provider
+    @singleton
+    def provide_prompts(self) -> PromptStore:
+        return PromptStore(config.get('prompt_base_path'))
+
+class PresetPromptsModule(Module):
+    @provider
+    @singleton
+    def provide_prompts(self) -> PresetPrompts:
+        return PresetPrompts(config.get('preset_path'))
+
+class AgentManagerModule(Module):
+    @provider
+    @singleton
+    def provide_agent_manager(self) -> AgentManager:
+        return AgentManager(config.get('agents_path'))
+
+
+
+class PreProcessModule(Module):
+    @provider
+    @singleton
+    @inject
+    def provide_message_preprocess(self, preset_prompts: PresetPrompts) -> MessagePreProcess:
+        return MessagePreProcess(preset_prompts)
+    
+class FileResponseHandlerModule(Module):
+    @provider
+    @singleton
+    def provide_agent_manager(self) -> FileResponseHandler:
+        return FileResponseHandler(1000)
 
 def configure_container():
-    container = Injector([AgentManagerModule(), PromptsModule()])
+    container = Injector([AgentManagerModule(), PresetPromptsModule(), PreProcessModule(), PromptStoreModule(), 
+                          FileResponseHandlerModule(), ConfigManagerModule()])
     return container
 
 container = configure_container()
+
+
+    
+#class MessageProcessorStoreModule(Module):
+#    @provider
+#    @singleton
+#    def provide_agent_manager(self) -> MessageProcessorStore:
+ #       return MessageProcessorStore()
+
+#class MessageProcessor:
+#    @inject
+#    def __init__(self, agent_prompt_manager: PromptManager, account_prompt_manager: PromptManager, handler: FileResponseHandler, context_type: str):
+#        ...
