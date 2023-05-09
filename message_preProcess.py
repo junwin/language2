@@ -10,8 +10,16 @@ import re
 from typing import List, Dict, Set
 import json
 import logging
+from injector import Injector
+from container_config import container
 
 class MessagePreProcess:
+
+    def __init__(self):
+        self.preset_prompts = container.get(Prompts)
+       
+       
+
     def alternative_processing(self, message, conversationId, agent, account_prompt_manager):
         response = {"action": None, "result": None}
         
@@ -32,7 +40,7 @@ class MessagePreProcess:
     def process_preset_prompt(self, message)  -> str: 
         myResult = self.transform_to_dict(message, 1)
         preset_name = myResult["seedName"]
-        prompt = Prompts.instance().get_prompt(preset_name)
+        prompt = self.preset_prompts.get_prompt(preset_name)
         if prompt is None:
             my_response = "no such preset: " + preset_name
             return my_response
@@ -50,7 +58,7 @@ class MessagePreProcess:
         return self.process_preset_prompt_values(preset_name, values)
     
     def process_preset_prompt_values(self, preset_name: str, values: List[str])  -> str: 
-        prompt = Prompts.instance().get_prompt(preset_name)
+        prompt = self.preset_prompts.get_prompt(preset_name)
         
         if prompt is None:
             my_response = "no such preset: " + preset_name
@@ -133,7 +141,7 @@ class MessagePreProcess:
         preset_name = myResult["seedName"]
         
 
-        prompt = Prompts.instance().get_prompt(preset_name)
+        prompt = self.preset_prompts.get_prompt(preset_name)
         num_mandatory_params =  prompt['num_mandatory_params']
         myResult = self.transform_to_dict(message, num_mandatory_params)
         values = myResult["values"]

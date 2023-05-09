@@ -1,0 +1,13 @@
+{
+    "prompt_base_path": "data/prompts",
+    "agents_path": "static/data/agents.json",
+    "preset_path": "static/data/presets.json",
+    "swagger_url": "/api/docs",
+    "api_url": "/static/swagger.json",
+    "app_name": "Lucy API",
+    "ssl_cert": "192.168.1.245.pem",
+    "ssl_key": "192.168.1.245-key.pem",
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": true
+}

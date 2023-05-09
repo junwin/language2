@@ -8,6 +8,9 @@ from message_preProcess import MessagePreProcess
 from api_helpers import ask_question, get_completion
 from prompts import Prompts
 import re
+from injector import Injector
+from container_config import container
+
 
 
 
@@ -21,6 +24,9 @@ class MessageProcessor:
         self.handler = handler
         self.preprocessor = MessagePreProcess()
         # self.open_conversations()
+        # Get the AgentManager instance
+
+
 
     processors = {}
 
@@ -29,10 +35,11 @@ class MessageProcessor:
         processor_name = MessageProcessor.get_processor_name(agent_name, account_name)
 
         logging.info(f'get_message_processor: {processor_name}')
+        agent_manager = container.get(AgentManager)
 
         if processor_name not in MessageProcessor.processors:
             
-            agent = AgentManager.get_agent(agent_name)
+            agent = agent_manager.get_agent(agent_name)
 
             my_handler = FileResponseHandler(agent['max_output_size'])
 
@@ -53,8 +60,8 @@ class MessageProcessor:
 
     def process_message(self, message, conversationId="0"):
         logging.info(f'Processing message inbound: {message}')
-
-        agent = AgentManager.get_agent(self.agent_prompt_manager.agent_name)
+        agent_manager = container.get(AgentManager)
+        agent = agent_manager.get_agent(self.agent_prompt_manager.agent_name)
         model = agent["model"]
         temperature = agent["temperature"]
 

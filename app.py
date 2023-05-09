@@ -4,6 +4,7 @@ from message_processor import MessageProcessor, FileResponseHandler
 from prompt_manager import PromptManager
 from agent_manager import AgentManager
 from prompts import Prompts
+from prompts_module import PromptsModule
 
 from flask_cors import CORS
 import ssl
@@ -11,36 +12,45 @@ import json
 from typing import Set
 import logging
 
+from injector import Injector
+from agent_manager_module import AgentManagerModule
 
+from container_config import container
+from config_manager import ConfigManager
 
 
 
 app = Flask(__name__)
 CORS(app)
 
+
+config = ConfigManager('config.json')
+
+
 # Set up Swagger UI
 SWAGGER_URL = '/api/docs'
 API_URL = '/static/swagger.json'
 
 # things that should go in a config file
-prompt_base_path = "data/prompts"
-agents_path = "static/data/agents.json"
-preset_path = "static/data/presets.json"
+prompt_base_path = config.get("prompt_base_path", "data/prompts")
+agents_path = config.get("agents_path", "static/data/agents.json")
+preset_path = config.get("preset_path", "static/data/presets.json")
+
+
 
 # Configure logging
 logging.basicConfig(filename='logs/my_log_file.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-
 swaggerui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,
-    API_URL,
+    config.get("swagger_url", "/api/docs"),
+    config.get("api_url", "/static/swagger.json"),
     config={
-        'app_name': "Lucy API"
+        'app_name': config.get("app_name", "Lucy API")
     }
 )
-app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+app.register_blueprint(swaggerui_blueprint, url_prefix=config.get("swagger_url", "/api/docs"))
 
 
 processors = {}
@@ -49,10 +59,16 @@ processors = {}
 
 handler = FileResponseHandler()
 
-AgentManager.load_agents(agents_path)
-al = AgentManager.get_available_agents()
+# Get the AgentManager instance
+agent_manager = container.get(AgentManager)
+agent_manager.load_agents()
 
-preset =  Prompts.instance().load(preset_path)
+
+# Get the Prompts instance
+preset_prompts = container.get(Prompts)
+preset_prompts.load()
+
+
 
 
 def get_prompt_manager(prompt_base_path, agent_name, account_name, language_code):
@@ -63,20 +79,6 @@ def get_message_processor(prompt_base_path, agent_name, account_name, agents, pr
 
     manager=MessageProcessor.get_message_processor(agent_name, account_name, handler, prompt_base_path="data/prompts")
     return manager
-    processor_name = get_processor_name(agent_name, account_name)
-
-    if processor_name not in processors:
-        agent = AgentManager.get_agent(agent_name)
-        my_handler = FileResponseHandler(agent['max_output_size'])
-        account_prompt_manager = get_prompt_manager(
-            prompt_base_path, agent_name, account_name, agent['language_code'][:2])
-        agent_prompt_manager = get_prompt_manager(
-            prompt_base_path, agent_name, "aaaa", agent['language_code'][:2])
-        proc = MessageProcessor(
-            agent_prompt_manager, account_prompt_manager, my_handler, agent['select_type'])
-        processors[processor_name] = proc
-
-    return processors[processor_name]
 
 
 @app.route('/ask', methods=['POST'])
@@ -93,16 +95,16 @@ def ask():
         return jsonify({"error": "Missing question, agentName, accountName, or conversationId"}), 400
 
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    my_agent = AgentManager.get_agent(agentName)
+    my_agent = agent_manager.get_agent(agentName)
     
     processor_name = get_processor_name(agentName, accountName)
     file_path = get_complete_path(prompt_base_path, agentName, accountName)
     if not select_type:
         select_type = my_agent['select_type']
-    agents = AgentManager.get_available_agents()
+    agents = agent_manager.get_available_agents()
     processor = get_message_processor(
         prompt_base_path, agentName, accountName, agents, processors)
 
@@ -116,7 +118,7 @@ def ask():
 @app.route('/agents', methods=['GET'])
 def get_agents():
     try: 
-        my_list = AgentManager.get_available_agents()
+        my_list = agent_manager.get_available_agents()
         zz = jsonify(my_list)
         return jsonify(my_list)
     except Exception as e:
@@ -140,16 +142,16 @@ def post_prompt():
     if not question or not agentName or not accountName:
         return jsonify({"error": "Missing question, agentName, accountName, or conversationId"}), 400
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    my_agent = AgentManager.get_agent(agentName)
+    my_agent = agent_manager.get_agent(agentName)
 
 
     if not select_type:
         select_type = my_agent['select_type']
 
-    agents = AgentManager.get_available_agents()
+    agents = agent_manager.get_available_agents()
 
     processor = get_message_processor(prompt_base_path, agentName, accountName, agents, processors)
 
@@ -170,10 +172,10 @@ def post_prompts():
     if not agentName or not accountName or not conversationId:
         return jsonify({"error": "Missing agentName, accountName, conversationId"}), 400
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    agent = AgentManager.get_agent(agentName)
+    agent = agent_manager.get_agent(agentName)
 
     prompt_manager = get_prompt_manager(
         prompt_base_path, agentName, accountName, agent['language_code'][:2])
@@ -204,10 +206,10 @@ def put_prompts():
     if not agentName or not accountName or not prompt_id or not data:
         return jsonify({"error": "Missing agentName, accountName, or data"}), 400
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    agent = AgentManager.get_agent(agentName)
+    agent = agent_manager.get_agent(agentName)
 
     prompt_manager = get_prompt_manager(
         prompt_base_path, agentName, accountName, agent['language_code'][:2])
@@ -229,10 +231,10 @@ def delete_prompts():
     if not agentName or not accountName or not prompt_id:
         return jsonify({"error": "Missing agentName, accountName, or id"}), 400
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    agent = AgentManager.get_agent(agentName)
+    agent = agent_manager.get_agent(agentName)
 
     prompt_manager = get_prompt_manager(
         prompt_base_path, agentName, accountName, agent['language_code'][:2])
@@ -254,10 +256,10 @@ def get_prompts():
     if not agentName or not accountName or not conversationId:
         return jsonify({"error": "Missing agentName, accountName, or conversationId"}), 400
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    agent = AgentManager.get_agent(agentName)
+    agent = agent_manager.get_agent(agentName)
 
     prompt_manager = get_prompt_manager(
         prompt_base_path, agentName, accountName, agent['language_code'][:2])
@@ -275,10 +277,10 @@ def get_conversation_ids():
     if not agentName or not accountName:
         return jsonify({"error": "Missing agentName or accountName"}), 400
 
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    agent = AgentManager.get_agent(agentName)
+    agent = agent_manager.get_agent(agentName)
 
     prompt_manager = get_prompt_manager(
         prompt_base_path, agentName, accountName, agent['language_code'][:2])
@@ -297,10 +299,10 @@ def change_conversation_id():
     if not agentName or not accountName or not existingId or not newId:
         return jsonify({"error": "Missing agentName, accountName, existingId, or newId"}), 400
     
-    if not AgentManager.is_valid(agentName):
+    if not agent_manager.is_valid(agentName):
         return jsonify({"error": "Invalid agentName"}), 400
 
-    agent = AgentManager.get_agent(agentName)
+    agent = agent_manager.get_agent(agentName)
 
     prompt_manager = get_prompt_manager(
         prompt_base_path, agentName, accountName, agent['language_code'][:2])
@@ -320,7 +322,8 @@ def get_processor_name(agent_name, account_name):
     return processor_name
 
 
+
 if __name__ == "__main__":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain('192.168.1.245.pem', '192.168.1.245-key.pem')
-    app.run(host='0.0.0.0', port=5000, ssl_context=context, debug=True)
+    context.load_cert_chain(config.get("ssl_cert", "192.168.1.245.pem"), config.get("ssl_key", "192.168.1.245-key.pem"))
+    app.run(host=config.get("host", "0.0.0.0"), port=config.get("port", 5000), ssl_context=context, debug=config.get("debug", True))
