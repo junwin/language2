@@ -8,6 +8,8 @@ from api_helpers import ask_question, get_completion
 from prompts import Prompts
 import re
 from typing import List, Dict, Set
+import json
+import logging
 
 class MessagePreProcess:
     def alternative_processing(self, message, conversationId, agent, account_prompt_manager):
@@ -35,11 +37,15 @@ class MessagePreProcess:
             my_response = "no such preset: " + preset_name
             return my_response
 
-        num_mandatory_params = prompt["num_mandatory_params"]
+        num_mandatory_params = prompt['num_mandatory_params']
         myResult = self.transform_to_dict(message, num_mandatory_params)
 
         values = myResult["values"]
         preset_name = myResult["seedName"]
+
+        if preset_name == "eft_data_chunker":
+            response = self.etf_chunker(message)
+            return response
         
         return self.process_preset_prompt_values(preset_name, values)
     
@@ -119,3 +125,66 @@ class MessagePreProcess:
         #self.add_response_message(conversationId,  message, response)
 
         return "continue", new_request
+    
+    def etf_chunker(self, message)  -> str: 
+
+        # this just gets to the prompt name - we dont know how many parameters there are
+        myResult = self.transform_to_dict(message, 1)
+        preset_name = myResult["seedName"]
+        
+
+        prompt = Prompts.instance().get_prompt(preset_name)
+        num_mandatory_params =  prompt['num_mandatory_params']
+        myResult = self.transform_to_dict(message, num_mandatory_params)
+        values = myResult["values"]
+
+        num_mandatory_params =  prompt['num_mandatory_params']
+
+        my_len = len(values)
+
+        if my_len < num_mandatory_params:
+            response = "missing some parameters here is some info: " + prompt["info"]
+            return response
+
+        file_path = values[0]
+        chunk_size = int(values[1])
+        preset_name_chunk = values[2]
+        preset_name_analysis = values[3]
+        if my_len > 4:
+            analysis_instructions = values[4]
+        else:
+            analysis_instructions = ""
+
+        response = self.process_json_chunks(file_path, chunk_size, preset_name_chunk, preset_name_analysis, analysis_instructions)
+
+        return response
+
+    def read_chunks(self, data, chunk_size):
+        for i in range(0, len(data), chunk_size):
+            yield data[i:i + chunk_size]
+
+    def process_json_chunks(self, file_path, chunk_size, preset_name_chunk, preset_name_analysis, analysis_instructions=''):
+        logging.info(f'process_json_chunks: start')
+
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+
+        digest = ""
+        chunks = self.read_chunks(data, chunk_size)
+
+        count = 0
+        for chunk in chunks:
+            chunk_str = json.dumps(chunk)
+            summary = self.process_preset_prompt_values(preset_name_chunk, [chunk_str])
+            digest += summary
+            print(f'chunk processed: {count}')
+            count += 1
+        print('all chunks processed')
+        print('starting analysis')
+        logging.info(f'digest: {digest}')
+        analysis = self.process_preset_prompt_values(preset_name_analysis, [digest, analysis_instructions])
+        print('done')
+        logging.info(f'analysis: {analysis}')
+        logging.info(f'process_json_chunks: end')
+        return analysis
+
