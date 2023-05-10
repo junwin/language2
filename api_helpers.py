@@ -42,7 +42,7 @@ def get_completion(prompt, temperature=0, model="gpt-3.5-turbo", max_retries=3, 
                 messages=messages,
                 temperature=temperature,  # this is the degree of randomness of the model's output
             )
-            logging.info(f'get_completionend: {model}')
+            logging.info(f'get_completion end: {model}')
             return response.choices[0].message["content"]
             
         except RateLimitError as e:
