@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from datetime import datetime
 from spacy.lang.en import STOP_WORDS
+import re
 
 
 nltk.download('wordnet')
@@ -129,6 +130,10 @@ class PromptManager:
         return False
 
     def extract_keywords(self, content: str, top_n: int = 10) -> List[str]:
+
+        if 'request keywords:' in content:
+            return self.get_specified_keywords(content)
+
         # Process the content using SpaCy
         doc = self.nlp(content.lower())
 
@@ -153,12 +158,20 @@ class PromptManager:
 
         return keywords
 
-
+    def get_specified_keywords(self, input_str: str) -> List[str]:
+        # Extract text between ```
+        match = re.search('```(.*?)```', input_str, re.S)
+        if match:
+            extracted_text = match.group(1)
+            # Split extracted text by ','
+            return extracted_text.split(',')
+        else:
+            return []
 
     def concatenate_keywords(self, conversation_data):
-        keywords = conversation_data["keywords"]
-        concatenated_keywords = " ".join(keywords)
-        return concatenated_keywords
+            keywords = conversation_data["keywords"]
+            concatenated_keywords = " ".join(keywords)
+            return concatenated_keywords
 
     #def tokenize(self, text):
      #   return nltk.word_tokenize(text)

@@ -5,10 +5,8 @@ from injector import Module, provider, singleton
 from injector import inject
 from preset_prompts import PresetPrompts
 from config_manager import ConfigManager
-#from message_processor_store import  MessageProcessorStore
 from message_preProcess import MessagePreProcess
 from agent_manager import AgentManager
-#from prompt_manager import PromptManager
 from prompt_store import PromptStore
 from response_handler import FileResponseHandler 
 
@@ -55,7 +53,7 @@ class FileResponseHandlerModule(Module):
     @provider
     @singleton
     def provide_agent_manager(self) -> FileResponseHandler:
-        return FileResponseHandler(1000)
+        return FileResponseHandler(config.get('account_output_path'), 1000)
 
 def configure_container():
     container = Injector([AgentManagerModule(), PresetPromptsModule(), PreProcessModule(), PromptStoreModule(), 

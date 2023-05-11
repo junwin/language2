@@ -44,7 +44,7 @@
     },
     "eft_data_chunker": {
         "name": "eft_data_chunker",
-        "info": "/eft_data_chunker, path to file, chunk size int, extract_preset name, analysis_preset name",
+        "info": "/eft_data_chunker, C:/Users/junwi/source/repos/jupy/finance/outputRed2.json, 2, eft_metrics_extract, eft_analize_metrics, I am 65 and have a low risk tolerance",
         "num_mandatory_params": 5,
         "prompt": "",
         "model": "gpt-3.5-turbo"

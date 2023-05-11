@@ -10,7 +10,22 @@
         "write_file_threashold": 5000,
         "use_prompt_reduction": true,
         "temperature": 0,
+        "save_reposnses": true,
         "model": "gpt-4"
+    },
+    {
+        "name": "colin",
+        "seed_conversation": [],
+        "language_code": "en-US",
+        "select_type": "simpleprompt",
+        "num_past_conversations": 0,
+        "num_relevant_conversations": 1,
+        "max_output_size": 4000,
+        "write_file_threashold": 60000,
+        "use_prompt_reduction": false,
+        "temperature": 0,
+        "save_reposnses": false,
+        "model": "gpt-3.5-turbo"
     },
     {
         "name": "maria",
@@ -23,6 +38,7 @@
         "write_file_threashold": 6000,
         "use_prompt_reduction": true,
         "temperature": 1,
+        "save_reposnses": false,
         "model": "gpt-4"
     },
     {
@@ -36,6 +52,7 @@
         "write_file_threashold": 6000,
         "use_prompt_reduction": false,
         "temperature": 0,
+        "save_reposnses": true,
         "model": "gpt-3.5-turbo"
     },
     {
@@ -48,6 +65,7 @@
         "max_output_size": 4000,
         "write_file_threashold": 6000,
         "use_prompt_reduction": true,
+        "save_reposnses": true,
         "temperature": 0,
         "model": "gpt-4"
     },
@@ -61,6 +79,7 @@
         "max_output_size": 4000,
         "write_file_threashold": 6000,
         "use_prompt_reduction": false,
+        "save_reposnses": true,
         "temperature": 0,
         "model": "gpt-4"
     }

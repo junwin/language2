@@ -60,7 +60,7 @@ message_processor_store = MessageProcessorStore()
 
 
 
-handler = FileResponseHandler()
+handler = FileResponseHandler(config.get("account_output_path"), 1000)
 
 # Get the AgentManager instance
 agent_manager = container.get(AgentManager)

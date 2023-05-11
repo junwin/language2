@@ -4,8 +4,10 @@ from prompt_store import PromptStore
 from prompt_manager import PromptManager
 
 from response_handler import FileResponseHandler
+from source_code_response_handler import SourceCodeResponseHandler
 from agent_manager import AgentManager
 from message_preProcess import MessagePreProcess
+from preset_handler import PresetHandler
 from api_helpers import ask_question, get_completion
 from preset_prompts import PresetPrompts
 import re
@@ -24,13 +26,15 @@ class MessageProcessor:
         self.config = container.get(ConfigManager) 
         prompt_base_path=self.config.get('prompt_base_path')  
         prompt_store = container.get(PromptStore)
-        self.account_prompt_manager = prompt_store.get_prompt_manager(self.agent['name'], account_name, self.agent['language_code'][:2])
-        self.agent_prompt_manager = prompt_store.get_prompt_manager(self.agent['name'], self.config.get("agent_internal_account_name"), self.agent['language_code'][:2])   
+        self.account_prompt_manager: PromptManager = prompt_store.get_prompt_manager(self.agent['name'], account_name, self.agent['language_code'][:2])
+        self.agent_prompt_manager: PromptManager = prompt_store.get_prompt_manager(self.agent['name'], self.config.get("agent_internal_account_name"), self.agent['language_code'][:2])   
          
         self.seed_conversations = []
         self.context_type = self.agent["select_type"]
         self.handler = container.get(FileResponseHandler)   
         self.preprocessor = container.get(MessagePreProcess)
+        self.account_name = account_name
+        self.preset_handler = PresetHandler(container.get(PresetPrompts))
 
 
 
@@ -67,12 +71,19 @@ class MessageProcessor:
 
         response = ask_question(conversation, model, temperature)
 
-        response = self.handler.handle_response(response)  # Use the handler instance
+        if 'source_code' in response and 'file_path' in response:
+            logging.info(f'Processing code response: {response}')
+            my_handler = SourceCodeResponseHandler(self.config.get('account_output_path'), 0)
+            response = my_handler.handle_response(self.account_name, response)  # Use the source code handler instance
+        else:
+            response = self.handler.handle_response(self.account_name, response)  # Use the handler instance
+            
+
         logging.info(f'Processing message response: {response}')
 
-        self.add_response_message(conversationId,  message, response)
-
-        self.account_prompt_manager.save()
+        if self.config.get('save_reposnses') == 'true':
+            self.add_response_message(conversationId,  message, response)
+            self.account_prompt_manager.save()
 
         logging.info(f'Processing message complete: {message}')
 
@@ -114,7 +125,6 @@ class MessageProcessor:
     def assemble_conversation(self, content_text, conversationId, agent, context_type="none", seed_name="seed", seed_paramters=[], max_prompt_chars=6000, max_prompt_conversations=20):
         logging.info(f'assemble_conversation_new: {context_type}')
 
-        my_user_content = self.account_prompt_manager.create_conversation_item(content_text, 'user') 
 
         # agent properties that are used with the completions API
         model = agent["model"]
@@ -123,12 +133,23 @@ class MessageProcessor:
         num_relevant_conversations = agent["num_relevant_conversations"]
         use_prompt_reduction = agent["use_prompt_reduction"]
 
+        my_user_content = self.account_prompt_manager.create_conversation_item(content_text, 'user') 
+
 
         # get the agents seed prompts - this is fixed information for the agent
         agent_matched_seed_ids = self.get_matched_ids(self.agent_prompt_manager, "keyword_match_all", seed_name, num_relevant_conversations, num_past_conversations)
         agent_matched_ids = self.get_matched_ids(self.agent_prompt_manager, "keyword", content_text, num_relevant_conversations, num_past_conversations)
         agent_all_matched_ids = agent_matched_seed_ids + agent_matched_ids
         matched_conversations_agent = self.agent_prompt_manager.get_conversations_ids(agent_all_matched_ids)
+        if context_type == "simpleprompt":
+            my_agent_prompt = self.agent_prompt_manager.get_conversations_ids(agent_matched_ids)
+            my_text = my_agent_prompt[0]["content"] 
+            content_text = my_text + content_text   
+            matched_conversations_agent = []
+            #my_text = self.agent_prompt_manager.get_conversation_text_by_id(my_agent_prompt[0]) 
+
+
+        my_user_content = self.account_prompt_manager.create_conversation_item(content_text, 'user') 
 
         # get any matched account prompts for the account - this is fixed information for the account
         account_matched_ids = self.get_matched_ids(self.account_prompt_manager, context_type, content_text, num_relevant_conversations, num_past_conversations)
@@ -139,7 +160,7 @@ class MessageProcessor:
             text_info = self.account_prompt_manager.get_formatted_dialog(account_matched_ids)
 
             preset_values = [text_info, content_text]
-            my_useful_response = self.preprocessor.process_preset_prompt_values("getrelevantfacts", preset_values)
+            my_useful_response = self.preset_handler.process_preset_prompt_values("getrelevantfacts", preset_values)
             useful_reponse = self.get_data_item(my_useful_response, "Useful information:")
 
             if useful_reponse != 'NONE' :
@@ -179,91 +200,4 @@ class MessageProcessor:
 
         
 
-    def assemble_conversationZZ(self, content_text, conversationId, agent, context_type="none", max_prompt_chars=6000, max_prompt_conversations=20):
-        logging.info(f'assemble_conversation: {context_type}')
-        model = agent["model"]
-        temperature = agent["temperature"]
-        num_past_conversations = agent["num_past_conversations"]
-        num_relevant_conversations = agent["num_relevant_conversations"]
-  
-        my_content = [{"role": "user", "content": content_text}]
-
-        # get the agents seed prompts
-        agent_ids = self.agent_prompt_manager.find_keyword_promptIds("seed")
-
-        # get any matched prompts for the agent - this is fixed information for the agent
-        matched_prompts_agent = self.agent_prompt_manager.find_closest_promptIds(
-            content_text, 8, 0.1)
-        matched_conversations_agent = self.agent_prompt_manager.get_conversations_ids(
-            agent_ids + matched_prompts_agent)
-
-        # get the account prompts that match the request or are the latest
-        accountIds = []
-
-        if context_type == "keyword":
-            accountIds = self.account_prompt_manager.find_keyword_promptIds(
-                content_text)
-        elif context_type == "semantic":
-            accountIds = self.account_prompt_manager.find_closest_promptIds(
-                content_text, 8, 0.1)
-        elif context_type == "hybrid":
-            matched_prompts_closest = self.account_prompt_manager.find_closest_promptIds(
-                content_text, 4, 0.1)
-            matched_prompts_latest = self.account_prompt_manager.find_latest_promptIds(
-                num_past_conversations)
-            accountIds = matched_prompts_closest + matched_prompts_latest
-        elif context_type == "latest":
-            accountIds = self.account_prompt_manager.find_latest_promptIds(num_past_conversations)
-        else:
-            accountIds = []
-
-        # sort the account prompts
-        distinct_list = list(set(accountIds))
-        sorted_list = sorted(distinct_list)
-
-     
-        # get the account conversations for the matched prompts ids
-        matched_conversations_account = self.account_prompt_manager.get_conversations_ids(
-            sorted_list)
-
-        #logging.info( f'Processing matched_elements: {matched_conversations_account}')
-
-        if len(matched_conversations_account) > 0:
-            # sorted_matched_elements = sorted(matched_elements, key=lambda x: x["utc_timestamp"])
-            matched_conversations = [
-                conv_dict for conv_dict in matched_conversations_account]
-            all_text = " - ".join([conv["content"]
-                                  for conv in matched_conversations])
-            all_text = f"you previously discussed: {all_text}"
-            new_conversation_element = {"role": "system", "content": all_text}
-            matched_conversations = [new_conversation_element]
-            conversations = matched_conversations_agent + matched_conversations + my_content
-        else:
-            conversations = matched_conversations_agent + my_content
-
-        total_chars = sum(len(conv["content"]) for conv in conversations)
-        total_conversations = len(conversations)
-
-        #logging.info(f'Processing matched_elements 2: {conversations}')
-
-        if total_chars > max_prompt_chars:
-            truncated_conversations = self.seed_conversations.copy()
-            total_chars = sum(len(conv["content"])
-                              for conv in truncated_conversations)
-            for conv in matched_conversations_account + my_content:
-                if total_chars + len(conv["content"]) <= max_prompt_chars:
-                    truncated_conversations.append(conv)
-                    total_chars += len(conv["content"])
-                else:
-                    break
-            conversations = truncated_conversations
-            #logging.info(f'Processing matched_elements 3: {conversations}')
-        elif total_conversations > max_prompt_conversations:
-            remaining_space = max_prompt_conversations - \
-                len(self.seed_conversations) - 1
-            conversations = self.seed_conversations + \
-                matched_conversations[-remaining_space:] + my_content
-            #logging.info(f'Processing matched_elements 4: {conversations}')
-
-        #logging.info(f'returned prompt: {conversations}')
-        return conversations
+    
